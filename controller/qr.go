@@ -123,3 +123,62 @@ func DeleteUser(respw http.ResponseWriter, req *http.Request) {
 
 	helper.WriteJSON(respw, http.StatusOK, "User deleted successfully")
 }
+
+// Get All QR History by User ID
+func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
+	userID := req.URL.Query().Get("userId")
+	if userID == "" {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Missing user ID")
+		return
+	}
+
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	filter := bson.M{"userId": objID}
+	qrHistory, err := atdb.GetAllDoc[[]model.QrHistory](config.Mongoconn, "qrhistory", filter)
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	helper.WriteJSON(respw, http.StatusOK, qrHistory)
+}
+
+// Create QR History
+func PostQRHistory(respw http.ResponseWriter, req *http.Request) {
+	var newQR model.QrHistory
+	if err := json.NewDecoder(req.Body).Decode(&newQR); err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	newQR.ID = primitive.NewObjectID()
+	newQR.CreatedAt = time.Now()
+
+	if _, err := atdb.InsertOneDoc(config.Mongoconn, "qrhistory", newQR); err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	helper.WriteJSON(respw, http.StatusOK, newQR)
+}
+
+// Delete QR History
+func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
+	var qr model.QrHistory
+	if err := json.NewDecoder(req.Body).Decode(&qr); err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", bson.M{"_id": qr.ID}); err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	helper.WriteJSON(respw, http.StatusOK, "QR History deleted successfully")
+}
