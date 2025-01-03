@@ -175,7 +175,9 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", bson.M{"_id": qr.ID}); err != nil {
+	// Ambil kedua nilai yang dikembalikan oleh DeleteOneDoc
+	_, err := atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", bson.M{"_id": qr.ID})
+	if err != nil {
 		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
 		return
 	}
