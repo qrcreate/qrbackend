@@ -60,8 +60,12 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
 	newUser.UpdatedAt = time.Now()
 
 	// Check for duplicate email
-	count, err := atdb.(config.Mongoconn, "users", bson.M{"email": newUser.Email})
-	if err != nil || count > 0 {
+	count, err := atdb.GetCountDoc(config.Mongoconn, "users", bson.M{"email": newUser.Email})
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if count > 0 {
 		helper.WriteJSON(respw, http.StatusConflict, "Email already exists")
 		return
 	}
@@ -96,7 +100,7 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 		},
 	}
 
-	if _, err := atdb.UpdateDoc(config.Mongoconn, "users", filter, update); err != nil {
+	if _, err := atdb.UpdateOneDoc(config.Mongoconn, "users", filter, update); err != nil {
 		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -112,8 +116,7 @@ func DeleteUser(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	filter := bson.M{"_id": user.ID}
-	if err := atdb.DeleteOneDoc(config.Mongoconn, "users", filter); err != nil {
+	if _, err := atdb.DeleteOneDoc(config.Mongoconn, "users", bson.M{"_id": user.ID}); err != nil {
 		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
 		return
 	}
