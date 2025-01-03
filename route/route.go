@@ -151,8 +151,8 @@ func URL(w http.ResponseWriter, r *http.Request) {
 
 	case method == "POST" && path == "/data/proyek/menu":
 		controller.PostDataMenuProject(w, r)
-	case method == "POST" && path == "/approvebimbingan":
-		controller.ApproveBimbinganbyPoin(w, r)
+	// case method == "POST" && path == "/approvebimbingan":
+	// 	controller.ApproveBimbinganbyPoin(w, r)
 	case method == "DELETE" && path == "/data/proyek/menu":
 		controller.DeleteDataMenuProject(w, r)
 	case method == "POST" && path == "/notif/ux/postlaporan":
