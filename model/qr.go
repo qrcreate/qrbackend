@@ -17,7 +17,7 @@ type Users struct {
 	UpdatedAt  time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
-type QRHistory struct {
+type QrHistory struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	UserID      primitive.ObjectID `bson:"userId" json:"userId"`
 	Type        string             `bson:"type" json:"type"`
