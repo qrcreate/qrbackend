@@ -183,6 +183,8 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "POST" && path == "/auth/resend":
 		controller.ResendPasswordHandler(w, r)
 
+	case method == "GET" && path == "/get/user":
+		controller.GetUsers(w, r)
 	case method == "POST" && path == "/post/user":
 		controller.PostUser(w, r)
 	// Google Auth
