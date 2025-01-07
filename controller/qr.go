@@ -95,7 +95,6 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	update := bson.M{
 		"$set": bson.M{
 			"name":       updateUser.Name,
-			"profilePic": updateUser.ProfilePic,
 			"updatedAt":  time.Now(),
 		},
 	}

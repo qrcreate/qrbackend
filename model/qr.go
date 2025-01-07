@@ -11,8 +11,6 @@ type Users struct {
 	Name       string             `bson:"name" json:"name"`
 	Email      string             `bson:"email" json:"email"`
 	Password   string             `bson:"password" json:"password"`
-	GoogleID   string             `bson:"googleId" json:"googleId,omitempty"`
-	ProfilePic string             `bson:"profilePic" json:"profilePic"`
 	CreatedAt  time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt  time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
