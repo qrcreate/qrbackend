@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -64,21 +65,30 @@ func GetOneUser(respw http.ResponseWriter, req *http.Request) {
 
 var privateKey = os.Getenv("PRIVATEKEY")
 
-//create user
+// create user
 func PostUser(respw http.ResponseWriter, req *http.Request) {
+    // Debugging: Log saat fungsi dipanggil
+    log.Println("PostUser function called")
+
     var newUser model.Users
     if err := json.NewDecoder(req.Body).Decode(&newUser); err != nil {
+        log.Println("Error parsing request body:", err)
         http.Error(respw, "Error parsing request body: "+err.Error(), http.StatusBadRequest)
         return
     }
 
+    // Debugging: Log data yang diterima
+    log.Printf("Received user data: %+v\n", newUser)
+
     // Validasi input
     if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
+        log.Println("Validation failed: Missing required fields")
         http.Error(respw, "All fields (username, email, password) are required", http.StatusBadRequest)
         return
     }
 
     if len(newUser.Password) < 6 {
+        log.Println("Validation failed: Password too short")
         http.Error(respw, "Password must be at least 6 characters long", http.StatusBadRequest)
         return
     }
@@ -86,9 +96,13 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
     // Hash password
     hashedPassword, err := atdb.HashPass(newUser.Password)
     if err != nil {
+        log.Println("Error hashing password:", err)
         http.Error(respw, "Failed to hash password: "+err.Error(), http.StatusInternalServerError)
         return
     }
+
+    // Debugging: Log hashed password
+    log.Println("Password hashed successfully")
 
     newUser.Password = "" // Clear plaintext password
     newUser.PasswordHash = hashedPassword
@@ -96,11 +110,25 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
     newUser.CreatedAt = time.Now()
     newUser.UpdatedAt = time.Now()
 
+    // Debugging: Log data sebelum disimpan ke database
+    log.Printf("User data to be inserted: %+v\n", newUser)
+
     // Simpan user ke database
     insertedID, err := atdb.InsertOneDoc(config.Mongoconn, "users", newUser)
     if err != nil {
+        log.Println("Error inserting user data:", err)
         http.Error(respw, "Error inserting user data: "+err.Error(), http.StatusInternalServerError)
         return
+    }
+
+    // Debugging: Log ID user yang berhasil disimpan
+    log.Printf("User inserted with ID: %s\n", insertedID)
+
+    // Debugging: Log nilai privateKey
+    if privateKey == "" {
+        log.Println("PRIVATEKEY is empty or not set")
+    } else {
+        log.Println("PRIVATEKEY is set correctly")
     }
 
     // Buat payload untuk token
@@ -110,12 +138,19 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
         Email:    newUser.Email,
     }
 
+    // Debugging: Log token payload
+    log.Printf("Token payload: %+v\n", tokenPayload)
+
     // Buat token menggunakan watoken
     token, err := watoken.EncodeWithStruct(newUser.ID.Hex(), &tokenPayload, privateKey)
     if err != nil {
+        log.Println("Failed to generate token:", err)
         http.Error(respw, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
         return
     }
+
+    // Debugging: Log token yang dihasilkan
+    log.Println("Token generated successfully:", token)
 
     // Respons ke client
     response := map[string]interface{}{
@@ -127,6 +162,9 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
     }
     respw.Header().Set("Content-Type", "application/json")
     json.NewEncoder(respw).Encode(response)
+
+    // Debugging: Log bahwa respons berhasil dikirim
+    log.Println("Response sent to client")
 }
 
 
