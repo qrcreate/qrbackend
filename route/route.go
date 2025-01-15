@@ -196,6 +196,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteUser(w, r)
 	case method == "POST" && path == "/qr/login":
 		controller.LoginUser(w, r)
+	case method == "GET" && path == "/qr/user/me":
+		controller.GetLoggedInUser(w, r)
+	
 	//qr
 	case method == "GET" && path == "/get/qr":
 		controller.GetQRHistory(w, r)
