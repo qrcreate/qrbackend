@@ -106,8 +106,6 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
     helper.WriteJSON(respw, http.StatusOK, response)
 }
 
-
-
 // Update User
 func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	var updateUser model.Users
@@ -124,7 +122,7 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	filter := bson.M{"_id": updateUser.ID}
 	update := bson.M{
 		"$set": bson.M{
-			"name":       updateUser.Username,
+			"username":   updateUser.Username,
 			"updatedAt":  time.Now(),
 		},
 	}
