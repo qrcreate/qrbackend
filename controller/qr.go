@@ -108,31 +108,72 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
 
 // Update User
 func UpdateUser(respw http.ResponseWriter, req *http.Request) {
-	var updateUser model.Users
-	if err := json.NewDecoder(req.Body).Decode(&updateUser); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if updateUser.ID == primitive.NilObjectID {
+	// Ambil ID dari query parameter
+	id := req.URL.Query().Get("id")
+	if id == "" {
 		helper.WriteJSON(respw, http.StatusBadRequest, "User ID is required")
 		return
 	}
 
-	filter := bson.M{"_id": updateUser.ID}
-	update := bson.M{
-		"$set": bson.M{
-			"username":   updateUser.Username,
-			"updatedAt":  time.Now(),
-		},
-	}
-
-	if _, err := atdb.UpdateOneDoc(config.Mongoconn, "users", filter, update); err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+	// Konversi ID ke ObjectID
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	helper.WriteJSON(respw, http.StatusOK, "User updated successfully")
+	// Ambil data dari body request
+	var requestBody map[string]string
+	if err := json.NewDecoder(req.Body).Decode(&requestBody); err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Error decoding request body: "+err.Error())
+		return
+	}
+
+	// Siapkan perubahan
+	updateFields := bson.M{}
+
+	// Perbarui username jika disediakan
+	if username, exists := requestBody["username"]; exists && username != "" {
+		updateFields["username"] = username
+	}
+
+	// Perbarui password jika disediakan
+	if password, exists := requestBody["password"]; exists && password != "" {
+		hashedPassword, err := atdb.HashPass(password)
+		if err != nil {
+			helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
+			return
+		}
+		updateFields["passwordhash"] = hashedPassword
+	}
+
+	// Tambahkan timestamp pembaruan
+	updateFields["updatedAt"] = time.Now()
+
+	// Jika tidak ada field yang diupdate, kirim error
+	if len(updateFields) == 0 {
+		helper.WriteJSON(respw, http.StatusBadRequest, "No fields to update")
+		return
+	}
+
+	// Define filter dan update
+	filter := bson.M{"_id": objID}
+	update := bson.M{
+		"$set": updateFields,
+	}
+
+	// Update dokumen di MongoDB
+	if _, err := atdb.UpdateOneDoc(config.Mongoconn, "users", filter, update); err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, "Error updating user: "+err.Error())
+		return
+	}
+
+	// Berikan response dengan informasi perubahan
+	response := map[string]interface{}{
+		"message": "User updated successfully",
+		"changes": updateFields, // Tampilkan field yang diubah
+	}
+	helper.WriteJSON(respw, http.StatusOK, response)
 }
 
 // Delete User
