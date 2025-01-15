@@ -12,7 +12,7 @@ import (
 	"github.com/kimseokgis/backend-ai/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"golang.org/x/crypto/bcrypt"
+	
 
 	"github.com/aiteung/atdb"
 
@@ -42,34 +42,6 @@ func InsertOneDoc(db *mongo.Database, collection string, doc interface{}) (inser
 		fmt.Printf("InsertOneDoc: %v\n", err)
 	}
 	return insertResult.InsertedID
-}
-
-// Password
-func HashPass(passwordhash string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(passwordhash), 14)
-	return string(bytes), err
-}
-
-func CheckPasswordHash(passwordhash, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(passwordhash))
-	return err == nil
-}
-
-func IsPasswordValid(mongoconn *mongo.Database, userdata model.User) bool {
-	filter := bson.M{
-		"$or": []bson.M{
-			{"username": userdata.Username},
-			{"email": userdata.Email},
-		},
-	}
-
-	var res model.User
-	err := mongoconn.Collection("users").FindOne(context.TODO(), filter).Decode(&res)
-
-	if err == nil {
-		return CheckPasswordHash(userdata.PasswordHash, res.PasswordHash)
-	}
-	return false
 }
 
 // Get User

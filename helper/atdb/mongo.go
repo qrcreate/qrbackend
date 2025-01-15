@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gocroot/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func MongoConnect(mconn DBInfo) (db *mongo.Database, err error) {
@@ -215,4 +217,32 @@ func ReplaceOneDoc(db *mongo.Database, collection string, filter bson.M, doc int
 		return
 	}
 	return
+}
+
+// Password
+func HashPass(passwordhash string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(passwordhash), 14)
+	return string(bytes), err
+}
+
+func CheckPasswordHash(passwordhash, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(passwordhash))
+	return err == nil
+}
+
+func IsPasswordValid(mongoconn *mongo.Database, userdata model.Users) bool {
+	filter := bson.M{
+		"$or": []bson.M{
+			{"username": userdata.Username},
+			{"email": userdata.Email},
+		},
+	}
+
+	var res model.Users
+	err := mongoconn.Collection("users").FindOne(context.TODO(), filter).Decode(&res)
+
+	if err == nil {
+		return CheckPasswordHash(userdata.PasswordHash, res.PasswordHash)
+	}
+	return false
 }
