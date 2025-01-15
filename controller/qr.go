@@ -1,12 +1,14 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/helper/atdb"
+	"github.com/gocroot/helper/kimseok"
 	"github.com/gocroot/model"
 	"github.com/kimseokgis/backend-ai/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,8 +22,16 @@ func GetUsers(respw http.ResponseWriter, req *http.Request) {
 		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	// Hapus field sensitif dari response
+	for i := range users {
+		users[i].Password = ""
+		users[i].PasswordHash = ""
+	}
+
 	helper.WriteJSON(respw, http.StatusOK, users)
 }
+
 
 // Get User By ID
 func GetOneUser(respw http.ResponseWriter, req *http.Request) {
@@ -44,38 +54,77 @@ func GetOneUser(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Hapus field sensitif dari response
+	user.Password = ""
+	user.PasswordHash = ""
+
 	helper.WriteJSON(respw, http.StatusOK, user)
 }
 
 // Create User
+// Create User
 func PostUser(respw http.ResponseWriter, req *http.Request) {
 	var newUser model.Users
 	if err := json.NewDecoder(req.Body).Decode(&newUser); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+		helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
 		return
 	}
 
-	newUser.ID = primitive.NewObjectID()
-	newUser.CreatedAt = time.Now()
-	newUser.UpdatedAt = time.Now()
+	// Validasi input
+	if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
+		helper.WriteJSON(respw, http.StatusBadRequest, "All fields (username, email, password) are required")
+		return
+	}
 
-	// Check for duplicate email
-	count, err := atdb.GetCountDoc(config.Mongoconn, "users", bson.M{"email": newUser.Email})
+	// Hash password
+	hashedPassword, err := kimseok.HashPass(newUser.Password)
 	if err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+		helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
+		return
+	}
+
+	// Check for duplicate email or username
+	mongoConn := kimseok.SetConnection()
+	defer mongoConn.Client().Disconnect(context.TODO())
+
+	filter := bson.M{
+		"$or": []bson.M{
+			{"email": newUser.Email},
+			{"username": newUser.Username},
+		},
+	}
+	count, err := atdb.GetCountDoc(mongoConn, "users", filter)
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, "Error checking duplicate data: "+err.Error())
 		return
 	}
 	if count > 0 {
-		helper.WriteJSON(respw, http.StatusConflict, "Email already exists")
+		helper.WriteJSON(respw, http.StatusConflict, "Email or username already exists")
 		return
 	}
 
-	if _, err := atdb.InsertOneDoc(config.Mongoconn, "users", newUser); err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+	// Insert user data
+	newUser.ID = primitive.NewObjectID()
+	newUser.CreatedAt = time.Now()
+	newUser.UpdatedAt = time.Now()
+	newUser.PasswordHash = hashedPassword
+	newUser.Password = "" // Hapus password mentah agar tidak tersimpan di database
+
+	insertedID := kimseok.InsertUserdata(mongoConn, newUser.Username, newUser.Email, newUser.Password, hashedPassword)
+	if insertedID == nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, "Error inserting user data")
 		return
 	}
 
-	helper.WriteJSON(respw, http.StatusOK, newUser)
+	// Buat response JSON
+	response := map[string]interface{}{
+		"message":  "User registered successfully",
+		"user_id":  insertedID,
+		"username": newUser.Username,
+		"email":    newUser.Email,
+	}
+
+	helper.WriteJSON(respw, http.StatusOK, response)
 }
 
 // Update User
@@ -94,7 +143,7 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	filter := bson.M{"_id": updateUser.ID}
 	update := bson.M{
 		"$set": bson.M{
-			"name":       updateUser.Name,
+			"name":       updateUser.Username,
 			"updatedAt":  time.Now(),
 		},
 	}

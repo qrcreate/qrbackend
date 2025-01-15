@@ -63,7 +63,7 @@ func TestPostUser(t *testing.T) {
 
 	newUser := model.Users{
 		ID:        primitive.NewObjectID(),
-		Name:      "John Doe",
+		Username:      "John Doe",
 		Email:     "johndoe@example.com",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -93,7 +93,7 @@ func TestUpdateUser(t *testing.T) {
 
 	updateUser := model.Users{
 		ID:   primitive.NewObjectID(),
-		Name: "Updated Name",
+		Username: "Updated Name",
 	}
 	payload, _ := json.Marshal(updateUser)
 

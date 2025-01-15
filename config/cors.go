@@ -6,9 +6,8 @@ import (
 
 // Daftar origins yang diizinkan
 var Origins = []string{
-	"https://www.bukupedia.co.id",
-	"https://naskah.bukupedia.co.id",
-	"https://bukupedia.co.id",
+	"http://127.0.0.1:5500",
+	"http://127.0.0.1:5501",
 	"https://qrcreate.github.io",
 
 }
