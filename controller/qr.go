@@ -67,26 +67,45 @@ func PostUser(respw http.ResponseWriter, req *http.Request) {
         return
     }
 
-    // Simple insert
+    // Validasi input
+    if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
+        helper.WriteJSON(respw, http.StatusBadRequest, "All fields (username, email, password) are required")
+        return
+    }
+
+    // Hash password
+    hashedPassword, err := atdb.HashPass(newUser.Password)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
+        return
+    }
+
+    // Pastikan password plaintext tidak disimpan
+    newUser.Password = "" // Hapus password plaintext
+    newUser.PasswordHash = hashedPassword
+
+    // Inisialisasi atribut lain
     newUser.ID = primitive.NewObjectID()
     newUser.CreatedAt = time.Now()
     newUser.UpdatedAt = time.Now()
-    newUser.PasswordHash = "hashed_password_placeholder" // Temporary
 
+    // Masukkan ke database
     insertedID, err := atdb.InsertOneDoc(config.Mongoconn, "users", newUser)
     if err != nil {
         helper.WriteJSON(respw, http.StatusInternalServerError, "Error inserting user data: "+err.Error())
         return
     }
 
+    // Buat response JSON
     response := map[string]interface{}{
-        "message": "User registered successfully",
-        "user_id": insertedID,
-		"username": newUser.Username,
-		"email":    newUser.Email,
+        "message":  "User registered successfully",
+        "user_id":  insertedID,
+        "username": newUser.Username,
+        "email":    newUser.Email,
     }
     helper.WriteJSON(respw, http.StatusOK, response)
 }
+
 
 
 // Update User
