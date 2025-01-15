@@ -16,12 +16,6 @@ type Users struct {
     UpdatedAt    time.Time          `json:"updatedAt" bson:"updatedAt"`     
 }
 
-type TokenPayload struct {
-    ID       string `json:"id" bson:"id"`             
-    Username string `json:"username" bson:"username"` 
-    Email    string `json:"email" bson:"email"`       
-}
-
 type QrHistory struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	UserID      primitive.ObjectID `bson:"userId" json:"userId"`

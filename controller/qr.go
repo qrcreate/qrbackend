@@ -3,14 +3,11 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/helper/atdb"
-	"github.com/gocroot/helper/watoken"
 	"github.com/gocroot/model"
 	"github.com/kimseokgis/backend-ai/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,110 +60,52 @@ func GetOneUser(respw http.ResponseWriter, req *http.Request) {
 	helper.WriteJSON(respw, http.StatusOK, user)
 }
 
-var privateKey = os.Getenv("PRIVATEKEY")
-
-// create user
+// Create User
 func PostUser(respw http.ResponseWriter, req *http.Request) {
-    // Debugging: Log saat fungsi dipanggil
-    log.Println("PostUser function called")
-
     var newUser model.Users
     if err := json.NewDecoder(req.Body).Decode(&newUser); err != nil {
-        log.Println("Error parsing request body:", err)
-        http.Error(respw, "Error parsing request body: "+err.Error(), http.StatusBadRequest)
+        helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
         return
     }
-
-    // Debugging: Log data yang diterima
-    log.Printf("Received user data: %+v\n", newUser)
 
     // Validasi input
     if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
-        log.Println("Validation failed: Missing required fields")
-        http.Error(respw, "All fields (username, email, password) are required", http.StatusBadRequest)
-        return
-    }
-
-    if len(newUser.Password) < 6 {
-        log.Println("Validation failed: Password too short")
-        http.Error(respw, "Password must be at least 6 characters long", http.StatusBadRequest)
+        helper.WriteJSON(respw, http.StatusBadRequest, "All fields (username, email, password) are required")
         return
     }
 
     // Hash password
     hashedPassword, err := atdb.HashPass(newUser.Password)
     if err != nil {
-        log.Println("Error hashing password:", err)
-        http.Error(respw, "Failed to hash password: "+err.Error(), http.StatusInternalServerError)
+        helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
         return
     }
 
-    // Debugging: Log hashed password
-    log.Println("Password hashed successfully")
-
-    newUser.Password = "" // Clear plaintext password
+    // Pastikan password plaintext tidak disimpan
+    newUser.Password = "" // Hapus password plaintext
     newUser.PasswordHash = hashedPassword
+
+    // Inisialisasi atribut lain
     newUser.ID = primitive.NewObjectID()
     newUser.CreatedAt = time.Now()
     newUser.UpdatedAt = time.Now()
 
-    // Debugging: Log data sebelum disimpan ke database
-    log.Printf("User data to be inserted: %+v\n", newUser)
-
-    // Simpan user ke database
+    // Masukkan ke database
     insertedID, err := atdb.InsertOneDoc(config.Mongoconn, "users", newUser)
     if err != nil {
-        log.Println("Error inserting user data:", err)
-        http.Error(respw, "Error inserting user data: "+err.Error(), http.StatusInternalServerError)
+        helper.WriteJSON(respw, http.StatusInternalServerError, "Error inserting user data: "+err.Error())
         return
     }
 
-    // Debugging: Log ID user yang berhasil disimpan
-    log.Printf("User inserted with ID: %s\n", insertedID)
-
-    // Debugging: Log nilai privateKey
-    if privateKey == "" {
-        log.Println("PRIVATEKEY is empty or not set")
-    } else {
-        log.Println("PRIVATEKEY is set correctly")
-    }
-
-    // Buat payload untuk token
-    tokenPayload := model.TokenPayload{
-        ID:       newUser.ID.Hex(),
-        Username: newUser.Username,
-        Email:    newUser.Email,
-    }
-
-    // Debugging: Log token payload
-    log.Printf("Token payload: %+v\n", tokenPayload)
-
-    // Buat token menggunakan watoken
-    token, err := watoken.EncodeWithStruct(newUser.ID.Hex(), &tokenPayload, privateKey)
-    if err != nil {
-        log.Println("Failed to generate token:", err)
-        http.Error(respw, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
-
-    // Debugging: Log token yang dihasilkan
-    log.Println("Token generated successfully:", token)
-
-    // Respons ke client
+    // Buat response JSON
     response := map[string]interface{}{
         "message":  "User registered successfully",
         "user_id":  insertedID,
         "username": newUser.Username,
         "email":    newUser.Email,
-        "token":    token,
     }
-    respw.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(respw).Encode(response)
-
-    // Debugging: Log bahwa respons berhasil dikirim
-    log.Println("Response sent to client")
+    helper.WriteJSON(respw, http.StatusOK, response)
 }
-
 
 // Update User
 func UpdateUser(respw http.ResponseWriter, req *http.Request) {
