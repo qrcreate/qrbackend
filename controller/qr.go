@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/helper/atdb"
+	"github.com/gocroot/helper/watoken"
 	"github.com/gocroot/model"
 	"github.com/kimseokgis/backend-ai/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -60,52 +62,73 @@ func GetOneUser(respw http.ResponseWriter, req *http.Request) {
 	helper.WriteJSON(respw, http.StatusOK, user)
 }
 
-// Create User
+var privateKey = os.Getenv("PRIVATEKEY")
+
+//create user
 func PostUser(respw http.ResponseWriter, req *http.Request) {
     var newUser model.Users
     if err := json.NewDecoder(req.Body).Decode(&newUser); err != nil {
-        helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
+        http.Error(respw, "Error parsing request body: "+err.Error(), http.StatusBadRequest)
         return
     }
 
     // Validasi input
     if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
-        helper.WriteJSON(respw, http.StatusBadRequest, "All fields (username, email, password) are required")
+        http.Error(respw, "All fields (username, email, password) are required", http.StatusBadRequest)
+        return
+    }
+
+    if len(newUser.Password) < 6 {
+        http.Error(respw, "Password must be at least 6 characters long", http.StatusBadRequest)
         return
     }
 
     // Hash password
     hashedPassword, err := atdb.HashPass(newUser.Password)
     if err != nil {
-        helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
+        http.Error(respw, "Failed to hash password: "+err.Error(), http.StatusInternalServerError)
         return
     }
 
-    // Pastikan password plaintext tidak disimpan
-    newUser.Password = "" // Hapus password plaintext
+    newUser.Password = "" // Clear plaintext password
     newUser.PasswordHash = hashedPassword
-
-    // Inisialisasi atribut lain
     newUser.ID = primitive.NewObjectID()
     newUser.CreatedAt = time.Now()
     newUser.UpdatedAt = time.Now()
 
-    // Masukkan ke database
+    // Simpan user ke database
     insertedID, err := atdb.InsertOneDoc(config.Mongoconn, "users", newUser)
     if err != nil {
-        helper.WriteJSON(respw, http.StatusInternalServerError, "Error inserting user data: "+err.Error())
+        http.Error(respw, "Error inserting user data: "+err.Error(), http.StatusInternalServerError)
         return
     }
 
-    // Buat response JSON
+    // Buat payload untuk token
+    tokenPayload := model.TokenPayload{
+        ID:       newUser.ID.Hex(),
+        Username: newUser.Username,
+        Email:    newUser.Email,
+    }
+
+    // Buat token menggunakan watoken
+    token, err := watoken.EncodeWithStruct(newUser.ID.Hex(), &tokenPayload, privateKey)
+    if err != nil {
+        http.Error(respw, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    // Respons ke client
     response := map[string]interface{}{
         "message":  "User registered successfully",
         "user_id":  insertedID,
         "username": newUser.Username,
         "email":    newUser.Email,
+        "token":    token,
     }
-    helper.WriteJSON(respw, http.StatusOK, response)
+    respw.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(respw).Encode(response)
 }
+
 
 // Update User
 func UpdateUser(respw http.ResponseWriter, req *http.Request) {

@@ -201,7 +201,6 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.PostQRHistory(w, r)
 	case method == "DELETE" && path == "/delete/qr":
 		controller.DeleteQRHistory(w, r)
-	// Google Auth
 	default:
 		controller.NotFound(w, r)
 	}
