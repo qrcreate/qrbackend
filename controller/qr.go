@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -147,8 +148,10 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 		updateFields["passwordhash"] = hashedPassword
 	}
 
-	// Tambahkan timestamp pembaruan
-	updateFields["updatedAt"] = time.Now()
+	// Tambahkan timestamp pembaruan jika ada field yang diubah
+	if len(updateFields) > 0 {
+		updateFields["updatedAt"] = time.Now()
+	}
 
 	// Jika tidak ada field yang diupdate, kirim error
 	if len(updateFields) == 0 {
@@ -163,8 +166,15 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Update dokumen di MongoDB
-	if _, err := atdb.UpdateOneDoc(config.Mongoconn, "users", filter, update); err != nil {
+	result, err := config.Mongoconn.Collection("users").UpdateOne(context.TODO(), filter, update)
+	if err != nil {
 		helper.WriteJSON(respw, http.StatusInternalServerError, "Error updating user: "+err.Error())
+		return
+	}
+
+	// Periksa apakah dokumen ditemukan
+	if result.MatchedCount == 0 {
+		helper.WriteJSON(respw, http.StatusNotFound, "User not found")
 		return
 	}
 
