@@ -246,3 +246,9 @@ func IsPasswordValid(mongoconn *mongo.Database, userdata model.Users) bool {
 	}
 	return false
 }
+
+// VerifyPass digunakan untuk memverifikasi password dengan hash
+func VerifyPass(password, hashedPassword string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
+}

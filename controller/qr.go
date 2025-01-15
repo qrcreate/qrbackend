@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/helper/atdb"
+	"github.com/gocroot/helper/jwt"
 	"github.com/gocroot/model"
 	"github.com/kimseokgis/backend-ai/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -229,6 +230,64 @@ func DeleteUser(respw http.ResponseWriter, req *http.Request) {
 		"message": "User deleted successfully",
 		"user_id": requestBody.ID,
 	})
+}
+
+
+// Login User
+func LoginUser(respw http.ResponseWriter, req *http.Request) {
+    var loginData struct {
+        Email    string `json:"email"`
+        Password string `json:"password"`
+    }
+
+    // Decode body request
+    if err := json.NewDecoder(req.Body).Decode(&loginData); err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
+        return
+    }
+
+    // Validasi input
+    if loginData.Email == "" || loginData.Password == "" {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Both email and password are required")
+        return
+    }
+
+    // Cari pengguna berdasarkan email
+    filter := bson.M{"email": loginData.Email}
+    user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid email or password")
+        return
+    }
+
+    // Verifikasi password
+    if !atdb.VerifyPass(loginData.Password, user.PasswordHash) {
+        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid email or password")
+        return
+    }
+
+    // Hapus password dari response
+    user.Password = ""
+    user.PasswordHash = ""
+
+    // Buat token (JWT atau token lainnya)
+    token, err := jwt.GenerateJWT(user.ID.Hex())
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to generate token: "+err.Error())
+        return
+    }
+
+    // Kirim response dengan token
+    response := map[string]interface{}{
+        "message": "Login successful",
+        "token":   token,
+        "user": map[string]string{
+            "id":       user.ID.Hex(),
+            "username": user.Username,
+            "email":    user.Email,
+        },
+    }
+    helper.WriteJSON(respw, http.StatusOK, response)
 }
 
 // Get All QR History by User ID
