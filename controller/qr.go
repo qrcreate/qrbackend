@@ -188,18 +188,47 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 
 // Delete User
 func DeleteUser(respw http.ResponseWriter, req *http.Request) {
-	var user model.Users
-	if err := json.NewDecoder(req.Body).Decode(&user); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+	// Ambil ID dari body request
+	var requestBody struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&requestBody); err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Error decoding request body: "+err.Error())
 		return
 	}
 
-	if _, err := atdb.DeleteOneDoc(config.Mongoconn, "users", bson.M{"_id": user.ID}); err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+	// Validasi apakah ID diberikan
+	if requestBody.ID == "" {
+		helper.WriteJSON(respw, http.StatusBadRequest, "User ID is required")
 		return
 	}
 
-	helper.WriteJSON(respw, http.StatusOK, "User deleted successfully")
+	// Konversi ID ke ObjectID
+	objID, err := primitive.ObjectIDFromHex(requestBody.ID)
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Hapus dokumen berdasarkan ID
+	filter := bson.M{"_id": objID}
+	result, err := config.Mongoconn.Collection("users").DeleteOne(context.TODO(), filter)
+	if err != nil {
+		helper.WriteJSON(respw, http.StatusInternalServerError, "Error deleting user: "+err.Error())
+		return
+	}
+
+	// Periksa apakah dokumen ditemukan
+	if result.DeletedCount == 0 {
+		helper.WriteJSON(respw, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Respons sukses
+	helper.WriteJSON(respw, http.StatusOK, map[string]string{
+		"message": "User deleted successfully",
+		"user_id": requestBody.ID,
+	})
 }
 
 // Get All QR History by User ID
