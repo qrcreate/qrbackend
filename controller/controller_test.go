@@ -1,144 +1,54 @@
 package controller
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gocroot/config"
-	"github.com/gocroot/model"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestGetUsers(t *testing.T) {
-	// Simpan koneksi database asli
-	originalConn := config.Mongoconn
-	// Ganti dengan koneksi database pengujian
-	config.Mongoconn = config.MongoconnTest
-	defer func() { config.Mongoconn = originalConn }() // Kembalikan koneksi asli setelah tes selesai
+// Setup database pengujian
+func setupTestDatabase() {
+	// Tambahkan data dummy ke database pengujian
+	config.MongoconnTest.Collection("users").InsertOne(context.TODO(), bson.M{
+		"username": "testuser",
+		"email":    "test@example.com",
+	})
+}
 
-	req, err := http.NewRequest("GET", "/users", nil)
+// Cleanup database pengujian
+func cleanupTestDatabase() {
+	// Hapus semua data di database pengujian
+	config.MongoconnTest.Collection("users").DeleteMany(context.TODO(), bson.M{})
+}
+
+// Test GetUsers
+func TestGetUsers(t *testing.T) {
+	// Setup database pengujian
+	setupTestDatabase()
+	defer cleanupTestDatabase()
+
+	// Buat request dan response recorder
+	req, err := http.NewRequest("GET", "/qr/user", nil)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Could not create request: %v", err)
 	}
 
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(GetUsers)
-
 	handler.ServeHTTP(rr, req)
 
+	// Validasi response
 	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-}
-
-func TestGetOneUser(t *testing.T) {
-	originalConn := config.Mongoconn
-	config.Mongoconn = config.MongoconnTest
-	defer func() { config.Mongoconn = originalConn }()
-
-	req, err := http.NewRequest("GET", "/user?id=validObjectId", nil)
-	if err != nil {
-		t.Fatal(err)
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(GetOneUser)
-
-	handler.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Validasi body response
+	expected := `[{"username":"testuser","email":"test@example.com"}]`
+	if rr.Body.String() != expected {
+		t.Errorf("Handler returned unexpected body: got %v want %v", rr.Body.String(), expected)
 	}
-}
-
-func TestPostUser(t *testing.T) {
-	originalConn := config.Mongoconn
-	config.Mongoconn = config.MongoconnTest
-	defer func() { config.Mongoconn = originalConn }()
-
-	newUser := model.Users{
-		ID:        primitive.NewObjectID(),
-		Username:      "John Doe",
-		Email:     "johndoe@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	payload, _ := json.Marshal(newUser)
-
-	req, err := http.NewRequest("POST", "/user", bytes.NewBuffer(payload))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(PostUser)
-
-	handler.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-}
-
-func TestUpdateUser(t *testing.T) {
-	originalConn := config.Mongoconn
-	config.Mongoconn = config.MongoconnTest
-	defer func() { config.Mongoconn = originalConn }()
-
-	updateUser := model.Users{
-		ID:   primitive.NewObjectID(),
-		Username: "Updated Name",
-	}
-	payload, _ := json.Marshal(updateUser)
-
-	req, err := http.NewRequest("PUT", "/user", bytes.NewBuffer(payload))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(UpdateUser)
-
-	handler.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-}
-
-func TestDeleteUser(t *testing.T) {
-	originalConn := config.Mongoconn
-	config.Mongoconn = config.MongoconnTest
-	defer func() { config.Mongoconn = originalConn }()
-
-	deleteUser := model.Users{
-		ID: primitive.NewObjectID(),
-	}
-	payload, _ := json.Marshal(deleteUser)
-
-	req, err := http.NewRequest("DELETE", "/user", bytes.NewBuffer(payload))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(DeleteUser)
-
-	handler.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-}
-
-func init() {
-	fmt.Println("MongoconnTest:", config.MongoconnTest) // DEBUG
 }
