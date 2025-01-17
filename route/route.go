@@ -5,6 +5,7 @@ import (
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/controller"
+	"github.com/gocroot/helper"
 	"github.com/gocroot/helper/at"
 )
 
@@ -206,6 +207,16 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.PostQRHistory(w, r)
 	case method == "DELETE" && path == "/delete/qr":
 		controller.DeleteQRHistory(w, r)
+
+	//ghupload
+    case method == "POST" && helper.URLParam(path, "/upload/:path"):
+	    controller.PostUploadGithub(w, r)
+    case method == "GET" && helper.URLParam(path, "/files"):
+	    controller.GetGithubFiles(w, r)
+    case method == "PUT" && helper.URLParam(path, "/file/:path"):
+	    controller.UpdateGithubFile(w, r)
+    case method == "DELETE" && helper.URLParam(path, "/file/:path"):
+	    controller.DeleteGithubFile(w, r)
 	default:
 		controller.NotFound(w, r)
 	}
