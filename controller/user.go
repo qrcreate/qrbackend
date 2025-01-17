@@ -107,8 +107,8 @@ func PostDataUser(respw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error : Token Tidak Valid"
-		respn.Info = at.GetSecretFromHeader(req)
-		respn.Location = "Decode Token Error"
+		respn.Info = at.GetLoginFromHeader(req)
+		respn.Location = "Decode Token Error"+config.PublicKeyWhatsAuth
 		respn.Response = err.Error()
 		at.WriteJSON(respw, http.StatusForbidden, respn)
 		return
