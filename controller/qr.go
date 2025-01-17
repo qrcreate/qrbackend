@@ -8,7 +8,6 @@ import (
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/helper/atdb"
-	"github.com/gocroot/helper/jwt"
 	"github.com/gocroot/model"
 	"github.com/kimseokgis/backend-ai/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -233,98 +232,98 @@ func DeleteUser(respw http.ResponseWriter, req *http.Request) {
 }
 
 // Login User
-func LoginUser(respw http.ResponseWriter, req *http.Request) {
-    var loginData struct {
-        Email    string `json:"email"`
-        Password string `json:"password"`
-    }
+// func LoginUser(respw http.ResponseWriter, req *http.Request) {
+//     var loginData struct {
+//         Email    string `json:"email"`
+//         Password string `json:"password"`
+//     }
 
-    // Decode body request
-    if err := json.NewDecoder(req.Body).Decode(&loginData); err != nil {
-        helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
-        return
-    }
+//     // Decode body request
+//     if err := json.NewDecoder(req.Body).Decode(&loginData); err != nil {
+//         helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
+//         return
+//     }
 
-    // Validasi input
-    if loginData.Email == "" || loginData.Password == "" {
-        helper.WriteJSON(respw, http.StatusBadRequest, "Both email and password are required")
-        return
-    }
+//     // Validasi input
+//     if loginData.Email == "" || loginData.Password == "" {
+//         helper.WriteJSON(respw, http.StatusBadRequest, "Both email and password are required")
+//         return
+//     }
 
-    // Cari pengguna berdasarkan email
-    filter := bson.M{"email": loginData.Email}
-    user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
-    if err != nil || !atdb.VerifyPass(loginData.Password, user.PasswordHash) {
-        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid email or password")
-        return
-    }
+//     // Cari pengguna berdasarkan email
+//     filter := bson.M{"email": loginData.Email}
+//     user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
+//     if err != nil || !atdb.VerifyPass(loginData.Password, user.PasswordHash) {
+//         helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid email or password")
+//         return
+//     }
 
-    // Hapus informasi sensitif sebelum dikirim ke klien
-    user.Password = ""
-    user.PasswordHash = ""
+//     // Hapus informasi sensitif sebelum dikirim ke klien
+//     user.Password = ""
+//     user.PasswordHash = ""
 
-    // Buat token JWT
-    token, err := jwt.GenerateJWT(user.ID.Hex())
-    if err != nil {
-        helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to generate token")
-        return
-    }
+//     // Buat token JWT
+//     token, err := jwt.GenerateJWT(user.ID.Hex())
+//     if err != nil {
+//         helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to generate token")
+//         return
+//     }
 
-    // Set token ke cookie
-    http.SetCookie(respw, &http.Cookie{
-        Name:     "auth_token",
-        Value:    token,
-        Path:     "/",
-        HttpOnly: true,
-        Secure:   false, // Ubah ke true jika menggunakan HTTPS
-        MaxAge:   3600,  // Cookie berlaku selama 1 jam
-    })
+//     // Set token ke cookie
+//     http.SetCookie(respw, &http.Cookie{
+//         Name:     "auth_token",
+//         Value:    token,
+//         Path:     "/",
+//         HttpOnly: true,
+//         Secure:   false, // Ubah ke true jika menggunakan HTTPS
+//         MaxAge:   3600,  // Cookie berlaku selama 1 jam
+//     })
 
-    // Kirim respons JSON tanpa token
-    helper.WriteJSON(respw, http.StatusOK, map[string]interface{}{
-        "message": "Login successful",
-        "user": map[string]string{
-            "id":       user.ID.Hex(),
-            "username": user.Username,
-            "email":    user.Email,
-        },
-    })
-}
+//     // Kirim respons JSON tanpa token
+//     helper.WriteJSON(respw, http.StatusOK, map[string]interface{}{
+//         "message": "Login successful",
+//         "user": map[string]string{
+//             "id":       user.ID.Hex(),
+//             "username": user.Username,
+//             "email":    user.Email,
+//         },
+//     })
+// }
 
-func GetLoggedInUser(respw http.ResponseWriter, req *http.Request) {
-    cookie, err := req.Cookie("auth_token")
-    if err != nil {
-        http.Error(respw, "Unauthorized: No token provided", http.StatusUnauthorized)
-        return
-    }
+// func GetLoggedInUser(respw http.ResponseWriter, req *http.Request) {
+//     cookie, err := req.Cookie("auth_token")
+//     if err != nil {
+//         http.Error(respw, "Unauthorized: No token provided", http.StatusUnauthorized)
+//         return
+//     }
 
-    // Validasi token JWT
-    tokenString := cookie.Value
-    claims, err := jwt.ValidateJWT(tokenString)
-    if err != nil {
-        http.Error(respw, "Unauthorized: Invalid token", http.StatusUnauthorized)
-        return
-    }
+//     // Validasi token JWT
+//     tokenString := cookie.Value
+//     claims, err := jwt.ValidateJWT(tokenString)
+//     if err != nil {
+//         http.Error(respw, "Unauthorized: Invalid token", http.StatusUnauthorized)
+//         return
+//     }
 
-    // Ambil user_id dari klaim token
-    userID := claims["user_id"].(string)
+//     // Ambil user_id dari klaim token
+//     userID := claims["user_id"].(string)
 
-    // Cari pengguna berdasarkan ID
-    objID, _ := primitive.ObjectIDFromHex(userID)
-    filter := bson.M{"_id": objID}
-    user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
-    if err != nil {
-        http.Error(respw, "User not found", http.StatusNotFound)
-        return
-    }
+//     // Cari pengguna berdasarkan ID
+//     objID, _ := primitive.ObjectIDFromHex(userID)
+//     filter := bson.M{"_id": objID}
+//     user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
+//     if err != nil {
+//         http.Error(respw, "User not found", http.StatusNotFound)
+//         return
+//     }
 
-    // Hapus informasi sensitif
-    user.Password = ""
-    user.PasswordHash = ""
+//     // Hapus informasi sensitif
+//     user.Password = ""
+//     user.PasswordHash = ""
 
-    // Kirim respons JSON
-    helper.WriteJSON(respw, http.StatusOK, user)
-}
+//     // Kirim respons JSON
+//     helper.WriteJSON(respw, http.StatusOK, user)
+// }
 
 
 // Get All QR History by User ID

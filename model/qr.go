@@ -23,6 +23,5 @@ type QrHistory struct {
 	Content     string             `bson:"content" json:"content"`
 	Name        string             `bson:"name" json:"name"`
 	QrImage     string             `bson:"qrImage" json:"qrImage"`
-	IsPermanent bool               `bson:"isPermanent" json:"isPermanent"`
 	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
 }
