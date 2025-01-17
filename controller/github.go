@@ -29,7 +29,7 @@ func GetGithubFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Mendapatkan daftar file dari repositori GitHub
-	content, err := ghupload.GithubListFiles(gh.GitHubAccessToken, "alittifaq", "cdn", "img")
+	content, err := ghupload.GithubListFiles(gh.GitHubAccessToken, "qrcreate", "cdn", "img")
 	if err != nil {
 		respn.Response = err.Error()
 		helper.WriteJSON(w, http.StatusInternalServerError, respn)
@@ -79,7 +79,7 @@ func PostUploadGithub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, _, err := ghupload.GithubUpload(gh.GitHubAccessToken, gh.GitHubAuthorName, gh.GitHubAuthorEmail, header, "alittifaq", "cdn", pathFile, false)
+	content, _, err := ghupload.GithubUpload(gh.GitHubAccessToken, gh.GitHubAuthorName, gh.GitHubAuthorEmail, header, "qrcreate", "cdn", pathFile, false)
 	if err != nil {
 		respn.Info = "gagal upload github"
 		respn.Response = err.Error()
@@ -136,7 +136,7 @@ func UpdateGithubFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the file in GitHub
-	content, _, err := ghupload.GithubUpdateFile(gh.GitHubAccessToken, gh.GitHubAuthorName, gh.GitHubAuthorEmail, fileHeader, "alittifaq", "cdn", fileName)
+	content, _, err := ghupload.GithubUpdateFile(gh.GitHubAccessToken, gh.GitHubAuthorName, gh.GitHubAuthorEmail, fileHeader, "qrcreate", "cdn", fileName)
 	if err != nil {
 		respn.Info = "Failed to update GitHub file"
 		respn.Response = err.Error()
@@ -169,7 +169,7 @@ func DeleteGithubFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, err = ghupload.GithubDeleteFile(gh.GitHubAccessToken, gh.GitHubAuthorName, gh.GitHubAuthorEmail, "alittifaq", "cdn", deleteRequest.FileName)
+	_, _, err = ghupload.GithubDeleteFile(gh.GitHubAccessToken, gh.GitHubAuthorName, gh.GitHubAuthorEmail, "qrcreate", "cdn", deleteRequest.FileName)
 	if err != nil {
 		respn.Info = "Failed to delete GitHub file"
 		respn.Response = err.Error()
