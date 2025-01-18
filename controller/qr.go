@@ -200,7 +200,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 }
 
 func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
-	// Dekode token dari header permintaan
+	// Decode token from header
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
 	if err != nil {
 		var respn model.Response
@@ -212,20 +212,26 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Dekode nama proyek dari body permintaan
-	var reqBody struct {
-		ProjectName string `json:"project_name"`
+	// Get the ID from the URL query parameters
+	id := req.URL.Query().Get("id") // Get ID from query parameter
+	if id == "" {
+		var respn model.Response
+		respn.Status = "Error: ID tidak ditemukan di query parameter"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
+		return
 	}
-	err = json.NewDecoder(req.Body).Decode(&reqBody)
+
+	// Convert the ID to ObjectId
+	objectId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		var respn model.Response
-		respn.Status = "Error : Body tidak valid"
+		respn.Status = "Error: Invalid ID format"
 		respn.Response = err.Error()
 		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	// Dapatkan data pengguna berdasarkan ID dari payload token
+	// Get user data from the database
 	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
 	if err != nil {
 		var respn model.Response
@@ -235,17 +241,17 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Cek apakah proyek dengan nama yang diberikan ada dan dimiliki oleh pengguna
-	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"name": reqBody.ProjectName, "owner._id": docuser.ID})
+	// Fetch the existing QR based on ID and user ownership
+	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": objectId, "owner._id": docuser.ID})
 	if err != nil {
 		var respn model.Response
-		respn.Status = "Error : Data QR tidak di temukan"
-		respn.Response = "Qr dengan nama tersebut tidak ditemukan atau bukan milik Anda"
+		respn.Status = "Error : QR tidak ditemukan"
+		respn.Response = "QR dengan ID tersebut tidak ditemukan atau bukan milik Anda"
 		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
-	// Hapus proyek dari koleksi "project" di MongoDB
+	// Delete QR from the qrhistory collection in MongoDB
 	_, err = atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID})
 	if err != nil {
 		var respn model.Response
@@ -255,6 +261,7 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Berhasil menghapus proyek
+	// Successfully deleted the QR
 	at.WriteJSON(respw, http.StatusOK, map[string]string{"status": "QR berhasil dihapus"})
 }
+
