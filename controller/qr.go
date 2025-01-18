@@ -1,388 +1,239 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gocroot/config"
+	"github.com/gocroot/helper/at"
 	"github.com/gocroot/helper/atdb"
+	"github.com/gocroot/helper/watoken"
 	"github.com/gocroot/model"
+	"github.com/gorilla/mux"
 	"github.com/kimseokgis/backend-ai/helper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Get All Users
-func GetUsers(respw http.ResponseWriter, req *http.Request) {
-	users, err := atdb.GetAllDoc[[]model.Users](config.Mongoconn, "users", bson.M{})
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// Hapus field sensitif dari response
-	for i := range users {
-		users[i].Password = ""
-		users[i].PasswordHash = ""
-	}
-
-	helper.WriteJSON(respw, http.StatusOK, users)
-}
-
-
-// Get User By ID
-func GetOneUser(respw http.ResponseWriter, req *http.Request) {
-	id := req.URL.Query().Get("id")
-	if id == "" {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Missing user ID")
-		return
-	}
-
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
-		return
-	}
-
-	filter := bson.M{"_id": objID}
-	user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusNotFound, "User not found")
-		return
-	}
-
-	// Hapus field sensitif dari response
-	user.Password = ""
-	user.PasswordHash = ""
-
-	helper.WriteJSON(respw, http.StatusOK, user)
-}
-
-// Create User
-func PostUser(respw http.ResponseWriter, req *http.Request) {
-    var newUser model.Users
-    if err := json.NewDecoder(req.Body).Decode(&newUser); err != nil {
-        helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
-        return
-    }
-
-    // Validasi input
-    if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
-        helper.WriteJSON(respw, http.StatusBadRequest, "All fields (username, email, password) are required")
-        return
-    }
-
-    // Hash password
-    hashedPassword, err := atdb.HashPass(newUser.Password)
-    if err != nil {
-        helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
-        return
-    }
-
-    // Pastikan password plaintext tidak disimpan
-    newUser.Password = "" // Hapus password plaintext
-    newUser.PasswordHash = hashedPassword
-
-    // Inisialisasi atribut lain
-    newUser.ID = primitive.NewObjectID()
-    newUser.CreatedAt = time.Now()
-    newUser.UpdatedAt = time.Now()
-
-    // Masukkan ke database
-    insertedID, err := atdb.InsertOneDoc(config.Mongoconn, "users", newUser)
-    if err != nil {
-        helper.WriteJSON(respw, http.StatusInternalServerError, "Error inserting user data: "+err.Error())
-        return
-    }
-
-    // Buat response JSON
-    response := map[string]interface{}{
-        "message":  "User registered successfully",
-        "user_id":  insertedID,
-        "username": newUser.Username,
-        "email":    newUser.Email,
-    }
-    helper.WriteJSON(respw, http.StatusOK, response)
-}
-
-// Update User
-func UpdateUser(respw http.ResponseWriter, req *http.Request) {
-	// Ambil ID dari query parameter
-	id := req.URL.Query().Get("id")
-	if id == "" {
-		helper.WriteJSON(respw, http.StatusBadRequest, "User ID is required")
-		return
-	}
-
-	// Konversi ID ke ObjectID
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
-		return
-	}
-
-	// Ambil data dari body request
-	var requestBody map[string]string
-	if err := json.NewDecoder(req.Body).Decode(&requestBody); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Error decoding request body: "+err.Error())
-		return
-	}
-
-	// Siapkan perubahan
-	updateFields := bson.M{}
-
-	// Perbarui username jika disediakan
-	if username, exists := requestBody["username"]; exists && username != "" {
-		updateFields["username"] = username
-	}
-
-	// Perbarui password jika disediakan
-	if password, exists := requestBody["password"]; exists && password != "" {
-		hashedPassword, err := atdb.HashPass(password)
-		if err != nil {
-			helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
-			return
-		}
-		updateFields["passwordhash"] = hashedPassword
-	}
-
-	// Tambahkan timestamp pembaruan jika ada field yang diubah
-	if len(updateFields) > 0 {
-		updateFields["updatedAt"] = time.Now()
-	}
-
-	// Jika tidak ada field yang diupdate, kirim error
-	if len(updateFields) == 0 {
-		helper.WriteJSON(respw, http.StatusBadRequest, "No fields to update")
-		return
-	}
-
-	// Define filter dan update
-	filter := bson.M{"_id": objID}
-	update := bson.M{
-		"$set": updateFields,
-	}
-
-	// Update dokumen di MongoDB
-	result, err := config.Mongoconn.Collection("users").UpdateOne(context.TODO(), filter, update)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, "Error updating user: "+err.Error())
-		return
-	}
-
-	// Periksa apakah dokumen ditemukan
-	if result.MatchedCount == 0 {
-		helper.WriteJSON(respw, http.StatusNotFound, "User not found")
-		return
-	}
-
-	// Berikan response dengan informasi perubahan
-	response := map[string]interface{}{
-		"message": "User updated successfully",
-		"changes": updateFields, // Tampilkan field yang diubah
-	}
-	helper.WriteJSON(respw, http.StatusOK, response)
-}
-
-// Delete User
-func DeleteUser(respw http.ResponseWriter, req *http.Request) {
-	// Ambil ID dari body request
-	var requestBody struct {
-		ID string `json:"id"`
-	}
-	if err := json.NewDecoder(req.Body).Decode(&requestBody); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Error decoding request body: "+err.Error())
-		return
-	}
-
-	// Validasi apakah ID diberikan
-	if requestBody.ID == "" {
-		helper.WriteJSON(respw, http.StatusBadRequest, "User ID is required")
-		return
-	}
-
-	// Konversi ID ke ObjectID
-	objID, err := primitive.ObjectIDFromHex(requestBody.ID)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
-		return
-	}
-
-	// Hapus dokumen berdasarkan ID
-	filter := bson.M{"_id": objID}
-	result, err := config.Mongoconn.Collection("users").DeleteOne(context.TODO(), filter)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, "Error deleting user: "+err.Error())
-		return
-	}
-
-	// Periksa apakah dokumen ditemukan
-	if result.DeletedCount == 0 {
-		helper.WriteJSON(respw, http.StatusNotFound, "User not found")
-		return
-	}
-
-	// Respons sukses
-	helper.WriteJSON(respw, http.StatusOK, map[string]string{
-		"message": "User deleted successfully",
-		"user_id": requestBody.ID,
-	})
-}
-
-// Login User
-// func LoginUser(respw http.ResponseWriter, req *http.Request) {
-//     var loginData struct {
-//         Email    string `json:"email"`
-//         Password string `json:"password"`
-//     }
-
-//     // Decode body request
-//     if err := json.NewDecoder(req.Body).Decode(&loginData); err != nil {
-//         helper.WriteJSON(respw, http.StatusBadRequest, "Error parsing request body: "+err.Error())
-//         return
-//     }
-
-//     // Validasi input
-//     if loginData.Email == "" || loginData.Password == "" {
-//         helper.WriteJSON(respw, http.StatusBadRequest, "Both email and password are required")
-//         return
-//     }
-
-//     // Cari pengguna berdasarkan email
-//     filter := bson.M{"email": loginData.Email}
-//     user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
-//     if err != nil || !atdb.VerifyPass(loginData.Password, user.PasswordHash) {
-//         helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid email or password")
-//         return
-//     }
-
-//     // Hapus informasi sensitif sebelum dikirim ke klien
-//     user.Password = ""
-//     user.PasswordHash = ""
-
-//     // Buat token JWT
-//     token, err := jwt.GenerateJWT(user.ID.Hex())
-//     if err != nil {
-//         helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to generate token")
-//         return
-//     }
-
-//     // Set token ke cookie
-//     http.SetCookie(respw, &http.Cookie{
-//         Name:     "auth_token",
-//         Value:    token,
-//         Path:     "/",
-//         HttpOnly: true,
-//         Secure:   false, // Ubah ke true jika menggunakan HTTPS
-//         MaxAge:   3600,  // Cookie berlaku selama 1 jam
-//     })
-
-//     // Kirim respons JSON tanpa token
-//     helper.WriteJSON(respw, http.StatusOK, map[string]interface{}{
-//         "message": "Login successful",
-//         "user": map[string]string{
-//             "id":       user.ID.Hex(),
-//             "username": user.Username,
-//             "email":    user.Email,
-//         },
-//     })
-// }
-
-// func GetLoggedInUser(respw http.ResponseWriter, req *http.Request) {
-//     cookie, err := req.Cookie("auth_token")
-//     if err != nil {
-//         http.Error(respw, "Unauthorized: No token provided", http.StatusUnauthorized)
-//         return
-//     }
-
-//     // Validasi token JWT
-//     tokenString := cookie.Value
-//     claims, err := jwt.ValidateJWT(tokenString)
-//     if err != nil {
-//         http.Error(respw, "Unauthorized: Invalid token", http.StatusUnauthorized)
-//         return
-//     }
-
-//     // Ambil user_id dari klaim token
-//     userID := claims["user_id"].(string)
-
-//     // Cari pengguna berdasarkan ID
-//     objID, _ := primitive.ObjectIDFromHex(userID)
-//     filter := bson.M{"_id": objID}
-//     user, err := atdb.GetOneDoc[model.Users](config.Mongoconn, "users", filter)
-//     if err != nil {
-//         http.Error(respw, "User not found", http.StatusNotFound)
-//         return
-//     }
-
-//     // Hapus informasi sensitif
-//     user.Password = ""
-//     user.PasswordHash = ""
-
-//     // Kirim respons JSON
-//     helper.WriteJSON(respw, http.StatusOK, user)
-// }
-
-
 // Get All QR History by User ID
 func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
-	userID := req.URL.Query().Get("userId")
-	if userID == "" {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Missing user ID")
-		return
-	}
-
-	objID, err := primitive.ObjectIDFromHex(userID)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID")
-		return
-	}
-
-	filter := bson.M{"userId": objID}
-	qrHistory, err := atdb.GetAllDoc[[]model.QrHistory](config.Mongoconn, "qrhistory", filter)
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	helper.WriteJSON(respw, http.StatusOK, qrHistory)
+    token := at.GetLoginFromHeader(req) 
+  
+    // Decode the token to get the user information
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid Token")
+        return
+    }
+  
+    // Extract the user ID from the decoded payload (which is a string)
+    userIDStr := payload.Id
+  
+    // Convert string userID to primitive.ObjectID
+    userID, err := primitive.ObjectIDFromHex(userIDStr)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+        return
+    }
+  
+    // MongoDB filter to get QR codes for this user
+    filter := bson.M{"userId": userID}
+    qrHistory, err := atdb.GetAllDoc[[]model.QrHistory](config.Mongoconn, "qrhistory", filter)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+        return
+    }
+  
+    helper.WriteJSON(respw, http.StatusOK, qrHistory)
 }
 
 // Create QR History
 func PostQRHistory(respw http.ResponseWriter, req *http.Request) {
-	var newQR model.QrHistory
-	if err := json.NewDecoder(req.Body).Decode(&newQR); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	newQR.ID = primitive.NewObjectID()
-	newQR.CreatedAt = time.Now()
-
-	if _, err := atdb.InsertOneDoc(config.Mongoconn, "qrhistory", newQR); err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	helper.WriteJSON(respw, http.StatusOK, newQR)
+    // Retrieve token from cookie
+    token := at.GetLoginFromHeader(req)
+  
+    // Decode the token to get user info
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid Token")
+        return
+    }
+  
+    // Get userId from the payload (which is a string)
+    userIDStr := payload.Id
+  
+    // Convert string userID to primitive.ObjectID
+    userID, err := primitive.ObjectIDFromHex(userIDStr)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+        return
+    }
+  
+    // Decode the QR data sent in the request body
+    var newQR model.QrHistory
+    if err := json.NewDecoder(req.Body).Decode(&newQR); err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+        return
+    }
+  
+    // Set userId for the new QR code
+    newQR.UserID = userID
+    newQR.CreatedAt = time.Now()
+  
+    // Insert the new QR code into the database
+    newQR.ID = primitive.NewObjectID()
+    if _, err := atdb.InsertOneDoc(config.Mongoconn, "qrhistory", newQR); err != nil {
+        helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+        return
+    }
+  
+    helper.WriteJSON(respw, http.StatusOK, newQR)
 }
 
+// Update QR
+func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
+    token := at.GetLoginFromHeader(req)
+
+    // Decode token to get user information
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid Token")
+        return
+    }
+
+    // Get userID from the payload
+    userIDStr := payload.Id
+
+    // Convert userID from string to primitive.ObjectID
+    userID, err := primitive.ObjectIDFromHex(userIDStr)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+        return
+    }
+
+    // Extract the ID from the URL path using mux
+    vars := mux.Vars(req)
+    id := vars["id"]  // this is where the id will be extracted from the URL
+
+    // Convert the extracted ID string into primitive.ObjectID
+    objectId, err := primitive.ObjectIDFromHex(id)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Invalid Object ID")
+        return
+    }
+
+    // Decode QR code data from the body request
+    var updatedQR model.QrHistory
+    if err := json.NewDecoder(req.Body).Decode(&updatedQR); err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+        return
+    }
+
+    // Ensure the QR code belongs to the logged-in user
+    if updatedQR.UserID != userID {
+        helper.WriteJSON(respw, http.StatusForbidden, "You are not authorized to edit this QR code")
+        return
+    }
+
+    // Prepare data to update
+    updateData := bson.M{
+        "name": updatedQR.Name,    // Update only name
+        "url":  updatedQR.URL,     // If URL doesn't change, include it as well
+        "createdAt": updatedQR.CreatedAt, // If CreatedAt doesn't change, include it as well
+    }
+
+    // Update the QR code in the database
+    _, err = atdb.UpdateOneDoc(config.Mongoconn, "qrhistory", bson.M{"_id": objectId}, updateData)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+        return
+    }
+
+    // Send success response
+    helper.WriteJSON(respw, http.StatusOK, "QR code updated successfully")
+}
+
+  
 // Delete QR History
 func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
-	var qr model.QrHistory
-	if err := json.NewDecoder(req.Body).Decode(&qr); err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	// Ambil kedua nilai yang dikembalikan oleh DeleteOneDoc
-	_, err := atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", bson.M{"_id": qr.ID})
-	if err != nil {
-		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	helper.WriteJSON(respw, http.StatusOK, "QR History deleted successfully")
+    token := at.GetLoginFromHeader(req) 
+  
+    // Decode the token
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid Token")
+        return
+    }
+  
+    // Get userId from the payload
+    userIDStr := payload.Id
+  
+    // Convert string userID to primitive.ObjectID
+    userID, err := primitive.ObjectIDFromHex(userIDStr)
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+        return
+    }
+  
+    // Decode the QR code ID from the request body
+    var qr model.QrHistory
+    if err := json.NewDecoder(req.Body).Decode(&qr); err != nil {
+        helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
+        return
+    }
+  
+    // Ensure the QR code belongs to the logged-in user
+    if qr.UserID != userID {
+        helper.WriteJSON(respw, http.StatusForbidden, "You are not authorized to delete this QR code")
+        return
+    }
+  
+    // Delete the QR code
+    _, err = atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", bson.M{"_id": qr.ID})
+    if err != nil {
+        helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
+        return
+    }
+  
+    helper.WriteJSON(respw, http.StatusOK, "QR History deleted successfully")
 }
+
+//download
+// func DownloadQR(respw http.ResponseWriter, req *http.Request) {
+//     // Extract the QR code ID from the URL path
+//     qrIDStr := at.URLParam(req.URL.Path, "/qrcode/") // Ensure this extracts the ID from URL
+//     if qrIDStr == "" {
+//         helper.WriteJSON(respw, http.StatusBadRequest, "QR code ID is missing from the URL")
+//         return
+//     }
+
+//     // Convert the extracted ID string into a primitive.ObjectID
+//     qrID, err := primitive.ObjectIDFromHex(qrIDStr)
+//     if err != nil {
+//         helper.WriteJSON(respw, http.StatusBadRequest, "Invalid QR code ID format")
+//         return
+//     }
+
+//     // Define the file path based on the ID
+//     filePath := filepath.Join("path/to/qr/codes", fmt.Sprintf("%s.png", qrID.Hex()))
+
+//     // Open the QR code file
+//     file, err := os.Open(filePath)
+//     if err != nil {
+//         helper.WriteJSON(respw, http.StatusNotFound, "QR code file not found")
+//         return
+//     }
+//     defer file.Close()
+
+//     // Set the headers to serve the file as an attachment
+//     respw.Header().Set("Content-Type", "image/png")
+//     respw.Header().Set("Content-Disposition", "attachment; filename=qr-code.png")
+
+//     // Stream the file to the response
+//     _, err = io.Copy(respw, file)
+//     if err != nil {
+//         helper.WriteJSON(respw, http.StatusInternalServerError, "Error streaming the file")
+//         return
+//     }
+// }

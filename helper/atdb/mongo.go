@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gocroot/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -230,22 +229,22 @@ func CheckPasswordHash(passwordhash, hash string) bool {
 	return err == nil
 }
 
-func IsPasswordValid(mongoconn *mongo.Database, userdata model.Users) bool {
-	filter := bson.M{
-		"$or": []bson.M{
-			{"username": userdata.Username},
-			{"email": userdata.Email},
-		},
-	}
+// func IsPasswordValid(mongoconn *mongo.Database, userdata model.User) bool {
+// 	filter := bson.M{
+// 		"$or": []bson.M{
+// 			{"username": userdata.Username},
+// 			{"email": userdata.Email},
+// 		},
+// 	}
 
-	var res model.Users
-	err := mongoconn.Collection("users").FindOne(context.TODO(), filter).Decode(&res)
+// 	var res model.User
+// 	err := mongoconn.Collection("users").FindOne(context.TODO(), filter).Decode(&res)
 
-	if err == nil {
-		return CheckPasswordHash(userdata.PasswordHash, res.PasswordHash)
-	}
-	return false
-}
+// 	if err == nil {
+// 		return CheckPasswordHash(userdata.PasswordHash, res.PasswordHash)
+// 	}
+// 	return false
+// }
 
 // VerifyPass digunakan untuk memverifikasi password dengan hash
 func VerifyPass(password, hashedPassword string) bool {

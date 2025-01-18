@@ -184,27 +184,13 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "POST" && path == "/auth/resend":
 		controller.ResendPasswordHandler(w, r)
 
-	//qr-user
-	case method == "GET" && path == "/qr/user":
-		controller.GetUsers(w, r)
-	case method == "GET" && path == "/qr/user/detail":
-		controller.GetOneUser(w, r)
-	case method == "POST" && path == "/qr/user":
-		controller.PostUser(w, r)
-	case method == "PUT" && path == "/qr/user":
-		controller.UpdateUser(w, r)
-	case method == "DELETE" && path == "/qr/user":
-		controller.DeleteUser(w, r)
-	// case method == "POST" && path == "/qr/login":
-	// 	controller.LoginUser(w, r)
-	// case method == "GET" && path == "/qr/user/me":
-	// 	controller.GetLoggedInUser(w, r)
-	
 	//qr
 	case method == "GET" && path == "/get/qr":
 		controller.GetQRHistory(w, r)
 	case method == "POST" && path == "/post/qr":
 		controller.PostQRHistory(w, r)
+	case method == "PUT" && path == "/put/qr/{id}":
+		controller.PutQRHistory(w, r)
 	case method == "DELETE" && path == "/delete/qr":
 		controller.DeleteQRHistory(w, r)
 
