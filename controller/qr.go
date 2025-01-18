@@ -123,7 +123,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error: Token Tidak Valid"
-		respn.Info = at.GetSecretFromHeader(req)
+		respn.Info = at.GetLoginFromHeader(req)
 		respn.Location = "Decode Token Error"
 		respn.Response = err.Error()
 		at.WriteJSON(respw, http.StatusForbidden, respn)
@@ -162,10 +162,8 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Preserve unmodifiable fields
-	prj.ID = existingprj.ID
-	prj.Secret = existingprj.Secret
-	prj.Owner = existingprj.Owner
-
+	prj.Name = existingprj.Name
+	prj.Url = existingprj.Url
 
 	// Save the updated project back to the database using ReplaceOneDoc
 	_, err = atdb.ReplaceOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID}, prj)
@@ -187,7 +185,7 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error : Token Tidak Valid"
-		respn.Info = at.GetSecretFromHeader(req)
+		respn.Info = at.GetLoginFromHeader(req)
 		respn.Location = "Decode Token Error"
 		respn.Response = err.Error()
 		at.WriteJSON(respw, http.StatusForbidden, respn)

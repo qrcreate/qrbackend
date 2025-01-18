@@ -189,7 +189,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.GetQRHistory(w, r)
 	case method == "POST" && path == "/post/qr":
 		controller.PostQRHistory(w, r)
-	case method == "PUT" && path == "/put/qr/{id}":
+	case method == "PUT" && path == "/put/qr":
 		controller.PutQRHistory(w, r)
 	case method == "DELETE" && path == "/delete/qr":
 		controller.DeleteQRHistory(w, r)
