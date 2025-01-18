@@ -130,7 +130,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Decode the project data from the request body
+	// Decode the QR data from the request body
 	var prj model.QrHistory
 	err = json.NewDecoder(req.Body).Decode(&prj)
 	if err != nil {
@@ -141,31 +141,40 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Get the ID from the URL query parameters
+	id := req.URL.Query().Get("id")
+	if id == "" {
+		var respn model.Response
+		respn.Status = "Error: ID tidak ditemukan di query parameter"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
+		return
+	}
+
 	// Get user data from the database
 	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error: Data user tidak ditemukan"
 		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusNotImplemented, respn)
+		helper.WriteJSON(respw, http.StatusNotImplemented, respn)
 		return
 	}
 
-	// Check if the project exists and belongs to the user
-	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": prj.ID, "owner._id": docuser.ID})
+	// Fetch the existing QR based on ID and user ownership
+	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": id, "owner._id": docuser.ID})
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error: QR tidak ditemukan"
 		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusNotFound, respn)
+		helper.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
-	// Preserve unmodifiable fields
-	prj.Name = existingprj.Name
-	prj.Url = existingprj.Url
+	prj.ID = existingprj.ID
+	prj.Secret = existingprj.Secret
+	prj.Owner = existingprj.Owner
 
-	// Save the updated project back to the database using ReplaceOneDoc
+	// Update the QR document in the database
 	_, err = atdb.ReplaceOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID}, prj)
 	if err != nil {
 		var respn model.Response
@@ -175,7 +184,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Return the updated project
+	// Return the updated QR
 	at.WriteJSON(respw, http.StatusOK, prj)
 }
 
