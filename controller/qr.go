@@ -150,6 +150,16 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Convert the ID to ObjectId
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		var respn model.Response
+		respn.Status = "Error: Invalid ID format"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
+		return
+	}
+
 	// Get user data from the database
 	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
 	if err != nil {
@@ -161,7 +171,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Fetch the existing QR based on ID and user ownership
-	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": id, "owner._id": docuser.ID})
+	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": objectId, "owner._id": docuser.ID})
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error: QR tidak ditemukan"
@@ -170,6 +180,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Preserve unmodifiable fields
 	prj.ID = existingprj.ID
 	prj.Secret = existingprj.Secret
 	prj.Owner = existingprj.Owner
