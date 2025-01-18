@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gocroot/config"
-	"github.com/gocroot/helper/at"
 	"github.com/gocroot/helper/atdb"
 	"github.com/gocroot/helper/watoken"
 	"github.com/gocroot/model"
@@ -222,42 +221,3 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 
 	helper.WriteJSON(respw, http.StatusOK, "QR History deleted successfully")
 }
-
-//download
-// func DownloadQR(respw http.ResponseWriter, req *http.Request) {
-//     // Extract the QR code ID from the URL path
-//     qrIDStr := at.URLParam(req.URL.Path, "/qrcode/") // Ensure this extracts the ID from URL
-//     if qrIDStr == "" {
-//         helper.WriteJSON(respw, http.StatusBadRequest, "QR code ID is missing from the URL")
-//         return
-//     }
-
-//     // Convert the extracted ID string into a primitive.ObjectID
-//     qrID, err := primitive.ObjectIDFromHex(qrIDStr)
-//     if err != nil {
-//         helper.WriteJSON(respw, http.StatusBadRequest, "Invalid QR code ID format")
-//         return
-//     }
-
-//     // Define the file path based on the ID
-//     filePath := filepath.Join("path/to/qr/codes", fmt.Sprintf("%s.png", qrID.Hex()))
-
-//     // Open the QR code file
-//     file, err := os.Open(filePath)
-//     if err != nil {
-//         helper.WriteJSON(respw, http.StatusNotFound, "QR code file not found")
-//         return
-//     }
-//     defer file.Close()
-
-//     // Set the headers to serve the file as an attachment
-//     respw.Header().Set("Content-Type", "image/png")
-//     respw.Header().Set("Content-Disposition", "attachment; filename=qr-code.png")
-
-//     // Stream the file to the response
-//     _, err = io.Copy(respw, file)
-//     if err != nil {
-//         helper.WriteJSON(respw, http.StatusInternalServerError, "Error streaming the file")
-//         return
-//     }
-// }
