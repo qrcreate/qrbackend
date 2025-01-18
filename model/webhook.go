@@ -78,13 +78,21 @@ type Project struct {
 	Members              []Userdomyikado    `bson:"members,omitempty" json:"members,omitempty"`
 	Closed               bool               `bson:"closed,omitempty" json:"closed,omitempty"`
 }
-
 type MenuItem struct {
 	IDDatabase primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
 	ID         string             `json:"id,omitempty" bson:"id,omitempty"`
 	Name       string             `json:"name,omitempty" bson:"name,omitempty"`
 	Price      int                `json:"price,omitempty" bson:"price,omitempty"`
 	Image      string             `json:"image,omitempty" bson:"image,omitempty"`
+}
+
+type QrHistory struct {
+	ID        primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	Secret               string             `bson:"secret,omitempty" json:"secret,omitempty"`
+	Owner     Userdomyikado      `bson:"owner" json:"owner"`     
+	Name      string             `json:"name" bson:"name"`
+	Url       string             `json:"url" bson:"url"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 }
 
 type Userdomyikado struct {
