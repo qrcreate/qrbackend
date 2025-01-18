@@ -166,6 +166,17 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.PutQRHistory(w, r)
 	case method == "DELETE" && path == "/delete/qr":
 		controller.DeleteQRHistory(w, r)
+
+	case method == "GET" && path == "/qr/user":
+		controller.GetUsers(w, r)
+	case method == "GET" && path == "/qr/user/detail":
+		controller.GetOneUser(w, r)
+	case method == "POST" && path == "/qr/user":
+		controller.PostUser(w, r)
+	case method == "PUT" && path == "/qr/user":
+		controller.UpdateUser(w, r)
+	case method == "DELETE" && path == "/qr/user":
+		controller.DeleteUser(w, r)
 	default:
 		controller.NotFound(w, r)
 	}
