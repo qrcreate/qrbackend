@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -103,6 +104,7 @@ func PutTokenDataUser(respw http.ResponseWriter, req *http.Request) {
 }
 
 func PostDataUser(respw http.ResponseWriter, req *http.Request) {
+	fmt.Println("Token received:", at.GetLoginFromHeader(req))
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
 	if err != nil {
 		var respn model.Response
