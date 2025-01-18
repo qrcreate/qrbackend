@@ -5,7 +5,12 @@ import (
 	"time"
 
 	"aidanwoods.dev/go-paseto"
+	"github.com/gocroot/model"
 )
+
+type TokenDecoder interface {
+    Decode(publicKey string, token string) (model.Payload, error)
+}
 
 type Payload[T any] struct {
 	Id    string    `json:"id"`

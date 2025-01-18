@@ -2,50 +2,25 @@ package ghupload
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 
 	"github.com/google/go-github/v59/github"
 
 	"golang.org/x/oauth2"
 )
 
-func GithubListFiles(GitHubAccessToken, githubOrg, githubRepo, path string) ([]*github.RepositoryContent, error) {
-	// Konfigurasi koneksi ke GitHub menggunakan token akses
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: GitHubAccessToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
-	// Mendapatkan daftar file dari repositori
-	_, directoryContent, _, err := client.Repositories.GetContents(ctx, githubOrg, githubRepo, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Tambahkan logging untuk melihat data yang dikembalikan
-	fmt.Printf("GithubListFiles: %v\n", directoryContent)
-
-	return directoryContent, nil
+// Function to calculate the SHA-256 hash of a file's content
+func CalculateHash(data []byte) string {
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
 }
 
-func GithubUpload(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail string, fileHeader *multipart.FileHeader, githubOrg string, githubRepo string, pathFile string, replace bool) (content *github.RepositoryContentResponse, response *github.Response, err error) {
-	// Open the file
-	file, err := fileHeader.Open()
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	// Read the file content
-	fileContent, err := io.ReadAll(file)
-	if err != nil {
-		return
-	}
-
-	// Konfigurasi koneksi ke GitHub menggunakan token akses
+// Function to upload file to GitHub with hashed filename
+func GithubUpload(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail string, fileContent []byte, githubOrg string, githubRepo string, pathFile string, replace bool) (content *github.RepositoryContentResponse, response *github.Response, err error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: GitHubAccessToken},
@@ -53,7 +28,6 @@ func GithubUpload(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail string,
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 
-	// Membuat opsi untuk mengunggah file
 	opts := &github.RepositoryContentFileOptions{
 		Message: github.String("Upload file"),
 		Content: fileContent,
@@ -64,7 +38,6 @@ func GithubUpload(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail string,
 		},
 	}
 
-	// Membuat permintaan untuk mengunggah file
 	content, response, err = client.Repositories.CreateFile(ctx, githubOrg, githubRepo, pathFile, opts)
 	if (err != nil) && (replace) {
 		currentContent, _, _, _ := client.Repositories.GetContents(ctx, githubOrg, githubRepo, pathFile, nil)
@@ -76,21 +49,14 @@ func GithubUpload(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail string,
 	return
 }
 
-func GithubUpdateFile(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail string, fileHeader *multipart.FileHeader, githubOrg, githubRepo, pathFile string) (*github.RepositoryContentResponse, *github.Response, error) {
-	// Open the file
-	file, err := fileHeader.Open()
-	if err != nil {
-		return nil, nil, err
-	}
-	defer file.Close()
-
-	// Read the file content
-	fileContent, err := io.ReadAll(file)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Konfigurasi koneksi ke GitHub menggunakan token akses
+// Function to get file content from GitHub repository
+// Set header untuk mendownload file
+// w.Header().Set("Content-Disposition", "attachment; filename=\"file.ext\"")
+// w.Header().Set("Content-Type", "application/octet-stream")
+// w.Header().Set("Content-Length", fmt.Sprint(len(fileContent)))
+// // Tulis konten file ke response writer
+// w.Write(fileContent)
+func GithubGetFile(GitHubAccessToken, githubOrg, githubRepo, pathFile string) (fileContent []byte, err error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: GitHubAccessToken},
@@ -98,56 +64,19 @@ func GithubUpdateFile(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail str
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 
-	// Get the current file to retrieve the SHA
-	currentContent, _, _, err := client.Repositories.GetContents(ctx, githubOrg, githubRepo, pathFile, nil)
+	// Get file content from the repository
+	downloadResponse, _, err := client.Repositories.DownloadContents(ctx, githubOrg, githubRepo, pathFile, nil)
 	if err != nil {
-		return nil, nil, err
+		err = errors.New("error GetContents " + err.Error())
+		return
 	}
+	defer downloadResponse.Close()
 
-	opts := &github.RepositoryContentFileOptions{
-		Message: github.String("Update file"),
-		Content: fileContent,
-		Branch:  github.String("main"),
-		SHA:     github.String(currentContent.GetSHA()),
-		Author: &github.CommitAuthor{
-			Name:  github.String(GitHubAuthorName),
-			Email: github.String(GitHubAuthorEmail),
-		},
-	}
-
-	// Update the file in the repository
-	return client.Repositories.UpdateFile(ctx, githubOrg, githubRepo, pathFile, opts)
-}
-
-func GithubDeleteFile(GitHubAccessToken, GitHubAuthorName, GitHubAuthorEmail, githubOrg, githubRepo, pathFile string) (*github.RepositoryContentResponse, *github.Response, error) {
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: GitHubAccessToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
-	// Get the current file to retrieve the SHA
-	currentContent, _, _, err := client.Repositories.GetContents(ctx, githubOrg, githubRepo, pathFile, nil)
+	// Read the binary content
+	fileContent, err = io.ReadAll(downloadResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, fmt.Errorf("error reading binary content: %w", err)
 	}
 
-	opts := &github.RepositoryContentFileOptions{
-		Message: github.String("Delete file"),
-		Branch:  github.String("main"),
-		SHA:     github.String(currentContent.GetSHA()),
-		Author: &github.CommitAuthor{
-			Name:  github.String(GitHubAuthorName),
-			Email: github.String(GitHubAuthorEmail),
-		},
-	}
-
-	// Delete the file from the repository
-	deleteResponse, response, err := client.Repositories.DeleteFile(ctx, githubOrg, githubRepo, pathFile, opts)
-	if err != nil {
-		return nil, response, err
-	}
-
-	return deleteResponse, response, nil
+	return
 }
