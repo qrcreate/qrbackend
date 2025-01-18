@@ -26,29 +26,36 @@ func getTokenFromCookie(req *http.Request) (string, error) {
 
 // Get All QR History by User ID
 func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
+	// Retrieve token from cookie
 	token, err := getTokenFromCookie(req)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusUnauthorized, "No token in cookie")
 		return
 	}
-	
+
 	// Decode the token to get the user information
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid Token")
 		return
 	}
-	
+
 	// Extract the user ID from the decoded payload (which is a string)
 	userIDStr := payload.Id
-	
+
+	// Validate userID format: must be a valid ObjectID (24-character hex string)
+	if len(userIDStr) != 24 {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+		return
+	}
+
 	// Convert string userID to primitive.ObjectID
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
 		return
 	}
-	
+
 	// MongoDB filter to get QR codes for this user
 	filter := bson.M{"userId": userID}
 	qrHistory, err := atdb.GetAllDoc[[]model.QrHistory](config.Mongoconn, "qrhistory", filter)
@@ -56,7 +63,7 @@ func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
 		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	helper.WriteJSON(respw, http.StatusOK, qrHistory)
 }
 
@@ -68,47 +75,54 @@ func PostQRHistory(respw http.ResponseWriter, req *http.Request) {
 		helper.WriteJSON(respw, http.StatusUnauthorized, "No token in cookie")
 		return
 	}
-	
+
 	// Decode the token to get user info
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusUnauthorized, "Invalid Token")
 		return
 	}
-	
+
 	// Get userId from the payload (which is a string)
 	userIDStr := payload.Id
-	
+
+	// Validate userID format: must be a valid ObjectID (24-character hex string)
+	if len(userIDStr) != 24 {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+		return
+	}
+
 	// Convert string userID to primitive.ObjectID
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
 		return
 	}
-	
+
 	// Decode the QR data sent in the request body
 	var newQR model.QrHistory
 	if err := json.NewDecoder(req.Body).Decode(&newQR); err != nil {
 		helper.WriteJSON(respw, http.StatusBadRequest, err.Error())
 		return
 	}
-	
+
 	// Set userId for the new QR code
 	newQR.UserID = userID
 	newQR.CreatedAt = time.Now()
-	
+
 	// Insert the new QR code into the database
 	newQR.ID = primitive.NewObjectID()
 	if _, err := atdb.InsertOneDoc(config.Mongoconn, "qrhistory", newQR); err != nil {
 		helper.WriteJSON(respw, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	helper.WriteJSON(respw, http.StatusOK, newQR)
 }
 
 // Update QR
 func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
+	// Retrieve token from cookie
 	token, err := getTokenFromCookie(req)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusUnauthorized, "No token in cookie")
@@ -124,6 +138,12 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 
 	// Get userID from the payload
 	userIDStr := payload.Id
+
+	// Validate userID format: must be a valid ObjectID (24-character hex string)
+	if len(userIDStr) != 24 {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+		return
+	}
 
 	// Convert userID from string to primitive.ObjectID
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
@@ -176,6 +196,7 @@ func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 
 // Delete QR History
 func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
+	// Retrieve token from cookie
 	token, err := getTokenFromCookie(req)
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusUnauthorized, "No token in cookie")
@@ -191,6 +212,12 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 
 	// Get userId from the payload
 	userIDStr := payload.Id
+
+	// Validate userID format: must be a valid ObjectID (24-character hex string)
+	if len(userIDStr) != 24 {
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
+		return
+	}
 
 	// Convert string userID to primitive.ObjectID
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
