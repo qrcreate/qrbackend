@@ -167,16 +167,30 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "DELETE" && path == "/delete/qr":
 		controller.DeleteQRHistory(w, r)
 
-	case method == "GET" && path == "/qr/user":
-		controller.GetUsers(w, r)
-	case method == "GET" && path == "/qr/user/detail":
-		controller.GetOneUser(w, r)
-	case method == "POST" && path == "/qr/user":
-		controller.PostUser(w, r)
-	case method == "PUT" && path == "/qr/user":
-		controller.UpdateUser(w, r)
-	case method == "DELETE" && path == "/qr/user":
-		controller.DeleteUser(w, r)
+//Register
+case method == "POST" && path == "/pdfm/register":
+	controller.RegisterHandler(w, r)
+
+//Login
+case method == "POST" && path == "/pdfm/login":
+	controller.GetUser(w, r)
+
+// Merge PDF Handler
+// case method == "POST" && path == "/pdfm/merge":
+// 	controller.MergePDFHandler(w, r)
+
+//CRUD 
+case method == "GET" && path == "/pdfm/get/users":
+	controller.GetUsers(w, r)
+case method == "POST" && path == "/pdfm/create/users":
+	controller.CreateUser(w, r)
+case method == "GET" && path == "/pdfm/getone/users":
+	controller.GetOneUser(w, r)
+case method == "PUT" && path == "/pdfm/update/users":
+	controller.UpdateUser(w, r)
+case method == "DELETE" && path == "/pdfm/delete/users":
+	controller.DeleteUser(w, r)
+
 	default:
 		controller.NotFound(w, r)
 	}

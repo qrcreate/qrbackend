@@ -251,3 +251,16 @@ func VerifyPass(password, hashedPassword string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err == nil
 }
+
+func UpdateWithPipeline(db *mongo.Database, collection string, filter bson.M, pipeline []bson.M) (*mongo.UpdateResult, error) {
+	ctx := context.TODO()
+	collectionRef := db.Collection(collection)
+	opts := options.Update().SetUpsert(false)
+
+	// Gunakan fungsi UpdateOne untuk menjalankan pipeline
+	updateResult, err := collectionRef.UpdateOne(ctx, filter, pipeline, opts)
+	if err != nil {
+		return nil, err
+	}
+	return updateResult, nil
+}
