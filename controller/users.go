@@ -48,9 +48,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Set nilai default untuk field lainnya
 	registrationData.ID = primitive.NewObjectID()
-	registrationData.IsSupport = false
-	registrationData.LastMergeTime = time.Time{} // Nilai default
-	registrationData.MergeCount = 0
 	registrationData.CreatedAt = time.Now()
 	registrationData.UpdatedAt = time.Now()
 
@@ -167,7 +164,6 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 		Name      string `json:"name"`
 		Email     string `json:"email"`
 		Password  string `json:"password"`
-		IsSupport bool   `json:"isSupport"`
 	}
 
 	// Decode JSON body
@@ -196,7 +192,6 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 			"name":      updateUser.Name,
 			"email":     updateUser.Email,
 			"password":  updateUser.Password,
-			"isSupport": updateUser.IsSupport,
 			"updatedAt": time.Now(),
 		},
 	}

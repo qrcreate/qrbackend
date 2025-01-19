@@ -31,9 +31,6 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.GetLatestHelpdeskMasuk(w, r)
 	case method == "GET" && path == "/data/user/helpdesk/selesai":
 		controller.GetLatestHelpdeskSelesai(w, r)
-	//pamong desa data from api
-	case method == "GET" && path == "/data/lms/user":
-		controller.GetDataUserFromApi(w, r)
 	//simpan testimoni dari pamong desa lms api
 	case method == "POST" && path == "/data/lms/testi":
 		controller.PostTestimoni(w, r)
@@ -46,9 +43,6 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	//simpan feedback unsubs user
 	case method == "POST" && path == "/data/peserta/unsubscribe":
 		controller.PostUnsubscribe(w, r)
-	//generate token linked device
-	case method == "PUT" && path == "/data/user":
-		controller.PutTokenDataUser(w, r)
 	//Menambhahkan data nomor sender untuk broadcast
 	case method == "PUT" && path == "/data/sender":
 		controller.PutNomorBlast(w, r)
@@ -94,12 +88,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.PostDataUser(w, r)
 	case method == "PUT" && path == "/data/user":
 		controller.UpdateDataUser(w, r)
-	// case method == "POST" && path == "/upload/profpic": //upload gambar profile
-	// 	controller.UploadProfilePictureHandler(w, r)
-	case method == "POST" && path == "/data/user/bio":
-		controller.PostDataBioUser(w, r)
-		/* 	case method == "POST" && at.URLParam(path, "/data/user/wa/:nomorwa"):
-		controller.PostDataUserFromWA(w, r) */
+
 	//data proyek
 	case method == "GET" && path == "/data/proyek":
 		controller.GetDataProject(w, r)
