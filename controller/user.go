@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -121,16 +120,6 @@ func PostDataUser(respw http.ResponseWriter, req *http.Request) {
         respn.Status = "Error: Isian tidak lengkap"
         respn.Response = "Mohon isi lengkap Name, PhoneNumber, dan Email"
         at.WriteJSON(respw, http.StatusBadRequest, respn)
-        return
-    }
-
-    // Cek apakah PhoneNumber sudah terdaftar
-    existingUser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": usr.PhoneNumber})
-    if err == nil && existingUser != nil {
-        var respn model.Response
-        respn.Status = "Error: User sudah terdaftar"
-        respn.Response = "Phone number sudah digunakan"
-        at.WriteJSON(respw, http.StatusConflict, respn)
         return
     }
 
