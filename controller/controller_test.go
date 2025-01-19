@@ -109,7 +109,7 @@ func TestUpdateUser(t *testing.T) {
 		"name":      "Updated Name",
 		"email":     "updated@example.com",
 		"password":  "newpassword123",
-		"isSupport": true,
+			"isSupport": true,
 	}
 	body, _ := json.Marshal(data)
 
@@ -128,6 +128,54 @@ func TestDeleteUser(t *testing.T) {
 	body, _ := json.Marshal(data)
 
 	rr := executeRequest(t, controller.DeleteUser, http.MethodDelete, "/pdfm/delete/users", body)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", rr.Code)
+	}
+}
+
+// Test RegisterGmailAuth
+func TestRegisterGmailAuth(t *testing.T) {
+	data := map[string]string{"token": "dummyToken"}
+	body, _ := json.Marshal(data)
+
+	rr := executeRequest(t, controller.RegisterGmailAuth, http.MethodPost, "/register-gmail-auth", body)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", rr.Code)
+	}
+}
+
+// Test GeneratePasswordHandler
+func TestGeneratePasswordHandler(t *testing.T) {
+	data := map[string]string{"phonenumber": "123456789", "captcha": "dummyCaptcha"}
+	body, _ := json.Marshal(data)
+
+	rr := executeRequest(t, controller.GeneratePasswordHandler, http.MethodPost, "/generate-password", body)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", rr.Code)
+	}
+}
+
+// Test VerifyPasswordHandler
+func TestVerifyPasswordHandler(t *testing.T) {
+	data := map[string]string{"phonenumber": "123456789", "password": "dummyPassword"}
+	body, _ := json.Marshal(data)
+
+	rr := executeRequest(t, controller.VerifyPasswordHandler, http.MethodPost, "/verify-password", body)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", rr.Code)
+	}
+}
+
+// Test ResendPasswordHandler
+func TestResendPasswordHandler(t *testing.T) {
+	data := map[string]string{"phonenumber": "123456789"}
+	body, _ := json.Marshal(data)
+
+	rr := executeRequest(t, controller.ResendPasswordHandler, http.MethodPost, "/resend-password", body)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %v", rr.Code)
