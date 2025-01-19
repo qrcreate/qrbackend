@@ -158,7 +158,6 @@ func CreateUser(respw http.ResponseWriter, req *http.Request) {
 }
 
 // Update User
-// Update User
 func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	var updateUser struct {
 		ID       string `json:"id"`
@@ -183,6 +182,7 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	// Validasi perubahan: hanya boleh nama, email, dan password yang bisa diupdate
 	updateFields := bson.M{}
 
+	// Menambahkan field yang tidak kosong
 	if updateUser.Name != "" {
 		updateFields["name"] = updateUser.Name
 	}
@@ -225,6 +225,7 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 
 	helper.WriteJSON(respw, http.StatusOK, "User updated successfully")
 }
+
 
 // Delete User
 func DeleteUser(respw http.ResponseWriter, req *http.Request) {
