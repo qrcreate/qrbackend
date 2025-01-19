@@ -62,10 +62,11 @@ func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
         return
     }
 
-    // Convert CreatedAt to the desired time format
+    // Convert CreatedAt to the desired time format and adjust timezone to Jakarta
     loc, _ := time.LoadLocation("Asia/Jakarta") // Set your desired timezone
     for i := range qrHistory {
-        qrHistory[i].CreatedAt = qrHistory[i].CreatedAt.In(loc) // Adjust the time zone
+        // Adjust the time zone for CreatedAt
+        qrHistory[i].CreatedAt = qrHistory[i].CreatedAt.In(loc) // Convert to Jakarta timezone
     }
 
     // Return the QR history with the formatted time
@@ -73,58 +74,68 @@ func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
 }
 
 
-func PostQRHistory(respw http.ResponseWriter, req *http.Request) {
-	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Token Tidak Valid"
-		respn.Info = at.GetLoginFromHeader(req)
-		respn.Location = "Decode Token Error"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusForbidden, respn)
-		return
-	}
-	var prj model.QrHistory
-	err = json.NewDecoder(req.Body).Decode(&prj)
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Body tidak valid"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
-	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Data user tidak di temukan"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusNotImplemented, respn)
-		return
-	}
-	prj.Owner = docuser
-	prj.Secret = watoken.RandomString(48)
-	prj.Name = normalize.SetIntoID(prj.Name)
-	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"name": prj.Name})
-	if err != nil {
-		idprj, err := atdb.InsertOneDoc(config.Mongoconn, "qrhistory", prj)
-		if err != nil {
-			var respn model.Response
-			respn.Status = "Gagal Insert Database"
-			respn.Response = err.Error()
-			at.WriteJSON(respw, http.StatusNotModified, respn)
-			return
-		}
-		prj.ID = idprj
-		at.WriteJSON(respw, http.StatusOK, prj)
-	} else {
-		var respn model.Response
-		respn.Status = "Error : Name QR sudah ada"
-		respn.Response = existingprj.Name
-		at.WriteJSON(respw, http.StatusConflict, respn)
-		return
-	}
 
+func PostQRHistory(respw http.ResponseWriter, req *http.Request) {
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Token Tidak Valid"
+        respn.Info = at.GetLoginFromHeader(req)
+        respn.Location = "Decode Token Error"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusForbidden, respn)
+        return
+    }
+
+    var prj model.QrHistory
+    err = json.NewDecoder(req.Body).Decode(&prj)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Body tidak valid"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
+
+    // Get user data based on phone number from the token payload
+    docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Data user tidak ditemukan"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusNotImplemented, respn)
+        return
+    }
+
+    prj.Owner = docuser
+    prj.Secret = watoken.RandomString(48)
+    prj.Name = normalize.SetIntoID(prj.Name)
+
+    // Set the current timestamp for CreatedAt
+    prj.CreatedAt = time.Now()  // Set current timestamp when creating the QR
+
+    // Check if the QR name already exists
+    existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"name": prj.Name})
+    if err != nil {
+        idprj, err := atdb.InsertOneDoc(config.Mongoconn, "qrhistory", prj)
+        if err != nil {
+            var respn model.Response
+            respn.Status = "Gagal Insert Database"
+            respn.Response = err.Error()
+            at.WriteJSON(respw, http.StatusNotModified, respn)
+            return
+        }
+        prj.ID = idprj
+        at.WriteJSON(respw, http.StatusOK, prj)
+    } else {
+        var respn model.Response
+        respn.Status = "Error : Name QR sudah ada"
+        respn.Response = existingprj.Name
+        at.WriteJSON(respw, http.StatusConflict, respn)
+        return
+    }
 }
+
 
 func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
 	// Decode token from header
