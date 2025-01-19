@@ -53,14 +53,16 @@ func GetQRHistory(respw http.ResponseWriter, req *http.Request) {
         return
     }
 
-    // If no QR history found, send a response with an info status
-    if len(qrHistory) == 0 {
-        var respn model.Response
-        respn.Status = "Info : Tidak ada QR History"
-        respn.Response = "Anda belum membuat QR, silakan buat QR terlebih dahulu."
-        helper.WriteJSON(respw, http.StatusOK, respn)  // Status OK with info message
-        return
-    }
+    
+    // Jika tidak ada QR history
+if len(qrHistory) == 0 {
+    var respn model.Response
+    respn.Status = "Info"  // Menggunakan status "Info" untuk menunjukkan bahwa tidak ada data
+    respn.Response = "Anda belum membuat QR, silakan buat QR terlebih dahulu."
+    helper.WriteJSON(respw, http.StatusOK, respn)  // Status OK dengan pesan info
+    return
+}
+
 
     // Convert CreatedAt to the desired time format and adjust timezone to Jakarta
     loc, _ := time.LoadLocation("Asia/Jakarta") // Set your desired timezone
@@ -261,15 +263,16 @@ func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
         return
     }
 
-    _, err = atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID})
-    if err != nil {
-        var respn model.Response
-        respn.Status = "Error : Gagal menghapus QR"
-        respn.Response = err.Error()
-        at.WriteJSON(respw, http.StatusExpectationFailed, respn)
-        return
-    }
-
-    // Return the response with the QR object instead of a map
-    at.WriteJSON(respw, http.StatusOK, existingprj)
+	_, err = atdb.DeleteOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID})
+	if err != nil {
+		var respn model.Response
+		respn.Status = "Error : Gagal menghapus QR"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusExpectationFailed, respn)
+		return
+	}
+	
+	// Kembalikan data QR yang dihapus sebagai respons
+	at.WriteJSON(respw, http.StatusOK, existingprj)
+	
 }
