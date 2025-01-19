@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gocroot/config"
@@ -77,8 +78,12 @@ func PostDataUser(respw http.ResponseWriter, req *http.Request) {
 }
 
 func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
+    // Mengambil token dari header dan log untuk debugging
+    token := at.GetLoginFromHeader(req)
+    fmt.Println("Token received:", token)
+    
     // Decode token untuk mendapatkan informasi pengguna
-    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
     if err != nil {
         var respn model.Response
         respn.Status = "Error : Token Tidak Valid"
@@ -108,9 +113,16 @@ func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
         return
     }
 
+    // Log untuk memastikan data user yang diterima benar
+    fmt.Println("User data received:", usr)
+
     // Update data nama user di database berdasarkan phone number yang ada di token
     filter := bson.M{"phonenumber": payload.Id}
     update := bson.M{"$set": bson.M{"name": usr.Name}}
+
+    // Log untuk melihat filter dan update yang digunakan dalam query
+    fmt.Println("Filter:", filter)
+    fmt.Println("Update:", update)
 
     // Menggunakan UpdateOne untuk mengupdate nama pengguna
     _, err = atdb.UpdateOneDoc(config.Mongoconn, "user", filter, update)
@@ -121,6 +133,9 @@ func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
         at.WriteJSON(respw, http.StatusInternalServerError, respn)
         return
     }
+
+    // Log untuk memastikan update berhasil
+    fmt.Println("Database updated successfully.")
 
     // Kembalikan data pengguna yang telah diperbarui
     at.WriteJSON(respw, http.StatusOK, usr)
