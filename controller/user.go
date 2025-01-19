@@ -81,7 +81,7 @@ func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
     // Mengambil token dari header dan log untuk debugging
     token := at.GetLoginFromHeader(req)
     fmt.Println("Token received:", token)
-    
+
     // Decode token untuk mendapatkan informasi pengguna
     payload, err := watoken.Decode(config.PublicKeyWhatsAuth, token)
     if err != nil {
@@ -118,6 +118,8 @@ func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
 
     // Update data nama user di database berdasarkan phone number yang ada di token
     filter := bson.M{"phonenumber": payload.Id}
+    
+    // Pastikan kita hanya melakukan update pada field tertentu, dalam hal ini nama
     update := bson.M{"$set": bson.M{"name": usr.Name}}
 
     // Log untuk melihat filter dan update yang digunakan dalam query
@@ -140,3 +142,4 @@ func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
     // Kembalikan data pengguna yang telah diperbarui
     at.WriteJSON(respw, http.StatusOK, usr)
 }
+

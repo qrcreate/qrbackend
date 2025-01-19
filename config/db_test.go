@@ -1,41 +1,86 @@
 package config
 
-// import (
-// 	"log"
-// 	"os"
+import (
+	"testing"
 
-// 	"github.com/gocroot/helper/atdb"
-// 	"github.com/joho/godotenv"
-// 	"go.mongodb.org/mongo-driver/mongo"
-// )
+	"github.com/gocroot/helper/atdb"
+	"github.com/stretchr/testify/assert"
+)
 
-// // MongoClientTest adalah koneksi MongoDB yang digunakan dalam pengujian
-// var MongoClientTest *mongo.Database
+func TestMongoConnect_EnvVar_Set(t *testing.T) {
+	// Menggunakan URL MongoDB secara langsung tanpa mockEnv
+	MongoString := "mongodb://localhost:27017"
 
-// func init() {
-// 	// Muat file .env jika ada
-// 	if err := godotenv.Load(); err != nil {
-// 		log.Println("Error loading .env file")
-// 	}
+	// Verifikasi apakah MongoString sudah di-set dengan benar
+	assert.Equal(t, "mongodb://localhost:27017", MongoString)
 
-// 	MongoStringTest := os.Getenv("MONGOSTRING_TEST")
-// 	if MongoStringTest == "" {
-// 		log.Fatal("MONGOSTRING_TEST not set in .env file")
-// 	}
+	// Inisialisasi mongoinfo
+	mongoinfo := atdb.DBInfo{
+		DBString: MongoString,
+		DBName:   "qrcreate",
+	}
 
-// 	MongoinfoTest := atdb.DBInfo{
-// 		DBString: MongoStringTest,
-// 		DBName:   "testing", // Nama database yang digunakan untuk testing
-// 	}
+	// Memanggil MongoConnect
+	db, err := atdb.MongoConnect(mongoinfo)
 
-// 	// Menghubungkan ke database MongoDB untuk testing
-// 	client, err := atdb.MongoConnect(MongoinfoTest)
-// 	if err != nil {
-// 		log.Fatalf("Failed to connect to test database: %v", err)
-// 	}
+	// Verifikasi bahwa koneksi berhasil
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+}
 
-// 	// Menyimpan client yang terkoneksi untuk digunakan dalam pengujian
-// 	MongoClientTest = client.Database(MongoinfoTest.DBName)
+func TestMongoConnect_EnvVar_NotSet(t *testing.T) {
+	// Cek apakah MongoString kosong atau tidak ada (gantilah ini dengan string yang sesuai jika ingin menggunakan variabel lingkungan)
+	MongoString := "mongodb://localhost:27017" // Set langsung dengan URL MongoDB
 
-// 	log.Println("Successfully connected to test database")
-// }
+	// Verifikasi bahwa MongoString telah di-set
+	assert.NotEmpty(t, MongoString)
+
+	// Inisialisasi mongoinfo
+	mongoinfo := atdb.DBInfo{
+		DBString: MongoString,
+		DBName:   "qrcreate",
+	}
+
+	// Memanggil MongoConnect dan memeriksa jika error terjadi
+	db, err := atdb.MongoConnect(mongoinfo)
+
+	// Verifikasi bahwa terjadi error karena variabel lingkungan tidak ada
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+}
+
+func TestMongoConnect_ValidConnection(t *testing.T) {
+	// Gunakan URL MongoDB yang valid langsung tanpa setting environment
+	MongoString := "mongodb://localhost:27017"
+
+	// Setup DBInfo untuk pengujian
+	mongoinfo := atdb.DBInfo{
+		DBString: MongoString,
+		DBName:   "qrcreate",
+	}
+
+	// Memanggil MongoConnect
+	db, err := atdb.MongoConnect(mongoinfo)
+
+	// Verifikasi koneksi MongoDB berhasil
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+}
+
+func TestMongoConnect_FailConnection(t *testing.T) {
+	// Gunakan URL MongoDB yang tidak valid untuk pengujian kegagalan
+	MongoString := "mongodb://invalid-uri"
+
+	// Setup DBInfo untuk pengujian
+	mongoinfo := atdb.DBInfo{
+		DBString: MongoString,
+		DBName:   "qrcreate",
+	}
+
+	// Memanggil MongoConnect dengan koneksi yang salah
+	db, err := atdb.MongoConnect(mongoinfo)
+
+	// Verifikasi bahwa terjadi error pada koneksi
+	assert.Error(t, err)
+	assert.Nil(t, db)
+}

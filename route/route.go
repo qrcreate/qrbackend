@@ -5,6 +5,7 @@ import (
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/controller"
+	"github.com/gocroot/helper/at"
 )
 
 func URL(w http.ResponseWriter, r *http.Request) {
@@ -15,6 +16,11 @@ func URL(w http.ResponseWriter, r *http.Request) {
 
 	var method, path string = r.Method, r.URL.Path
 	switch {
+	case method == "GET" && path == "/":
+		controller.GetHome(w, r)
+
+	case method == "POST" && at.URLParam(path, "/webhook/nomor/:nomorwa"):
+		controller.PostInboxNomor(w, r)
 	
 	//user data
 	case method == "GET" && path == "/data/user":
@@ -70,5 +76,7 @@ case method == "PUT" && path == "/pdfm/update/users":
 	controller.UpdateUser(w, r)
 case method == "DELETE" && path == "/pdfm/delete/users":
 	controller.DeleteUser(w, r)
+default:
+	controller.NotFound(w, r)
 	}
 }
