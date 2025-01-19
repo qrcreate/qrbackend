@@ -158,12 +158,13 @@ func CreateUser(respw http.ResponseWriter, req *http.Request) {
 }
 
 // Update User
+// Update User
 func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	var updateUser struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Email     string `json:"email"`
-		Password  string `json:"password"`
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	// Decode JSON body
@@ -175,35 +176,48 @@ func UpdateUser(respw http.ResponseWriter, req *http.Request) {
 	// Convert ID to ObjectID
 	objectID, err := primitive.ObjectIDFromHex(updateUser.ID)
 	if err != nil {
-		helper.WriteJSON(respw, http.StatusBadRequest, " format")
+		helper.WriteJSON(respw, http.StatusBadRequest, "Invalid user ID format")
 		return
 	}
 
-	// Check if isSupport (paid status) is true
-	// if !updateUser.IsSupport {
-	// 	helper.WriteJSON(respw, http.StatusForbidden, "User is not a supporter. Update not allowed.")
-	// 	return
-	// }
+	// Validasi perubahan: hanya boleh nama, email, dan password yang bisa diupdate
+	updateFields := bson.M{}
 
-	// Create filter and pipeline
-	filter := bson.M{"_id": objectID}
-	pipeline := bson.M{
-		"$set": bson.M{
-			"name":      updateUser.Name,
-			"email":     updateUser.Email,
-			"password":  updateUser.Password,
-			"updatedAt": time.Now(),
-		},
+	if updateUser.Name != "" {
+		updateFields["name"] = updateUser.Name
+	}
+	if updateUser.Email != "" {
+		updateFields["email"] = updateUser.Email
+	}
+	if updateUser.Password != "" {
+		updateFields["password"] = updateUser.Password
 	}
 
-	// Perform update operation using pipeline
+	// Jika tidak ada field yang diubah
+	if len(updateFields) == 0 {
+		helper.WriteJSON(respw, http.StatusBadRequest, "No fields to update")
+		return
+	}
+
+	// Tambahkan timestamp update
+	updateFields["updatedAt"] = time.Now()
+
+	// Create filter untuk mencari user berdasarkan ID
+	filter := bson.M{"_id": objectID}
+
+	// Perform update operation menggunakan pipeline
+	pipeline := bson.M{
+		"$set": updateFields,
+	}
+
+	// Melakukan operasi update
 	result, err := atdb.UpdateWithPipeline(config.Mongoconn, "users", filter, []bson.M{pipeline})
 	if err != nil {
 		helper.WriteJSON(respw, http.StatusInternalServerError, "Failed to update user: "+err.Error())
 		return
 	}
 
-	// Check if any document was updated
+	// Periksa apakah ada dokumen yang diupdate
 	if result.MatchedCount == 0 {
 		helper.WriteJSON(respw, http.StatusNotFound, "User not found")
 		return
