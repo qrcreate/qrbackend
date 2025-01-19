@@ -138,87 +138,80 @@ func PostQRHistory(respw http.ResponseWriter, req *http.Request) {
 
 
 func PutQRHistory(respw http.ResponseWriter, req *http.Request) {
-	// Decode token from header
-	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error: Token Tidak Valid"
-		respn.Info = at.GetLoginFromHeader(req)
-		respn.Location = "Decode Token Error"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusForbidden, respn)
-		return
-	}
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Token Tidak Valid"
+        respn.Info = at.GetLoginFromHeader(req)
+        respn.Location = "Decode Token Error"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusForbidden, respn)
+        return
+    }
 
-	// Decode the QR data from the request body
-	var prj model.QrHistory
-	err = json.NewDecoder(req.Body).Decode(&prj)
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error: Body tidak valid"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
+    var prj model.QrHistory
+    err = json.NewDecoder(req.Body).Decode(&prj)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Body tidak valid"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
 
-	// Get the ID from the URL query parameters
-	id := req.URL.Query().Get("id")
-	if id == "" {
-		var respn model.Response
-		respn.Status = "Error: ID tidak ditemukan di query parameter"
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
+    id := req.URL.Query().Get("id")
+    if id == "" {
+        var respn model.Response
+        respn.Status = "Error: ID tidak ditemukan di query parameter"
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
 
-	// Convert the ID to ObjectId
-	objectId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error: Invalid ID format"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
+    objectId, err := primitive.ObjectIDFromHex(id)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Invalid ID format"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
 
-	// Get user data from the database
-	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error: Data user tidak ditemukan"
-		respn.Response = err.Error()
-		helper.WriteJSON(respw, http.StatusNotImplemented, respn)
-		return
-	}
+    docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Data user tidak ditemukan"
+        respn.Response = err.Error()
+        helper.WriteJSON(respw, http.StatusNotImplemented, respn)
+        return
+    }
 
-	// Fetch the existing QR based on ID and user ownership
-	existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": objectId, "owner._id": docuser.ID})
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error: QR tidak ditemukan"
-		respn.Response = err.Error()
-		helper.WriteJSON(respw, http.StatusNotFound, respn)
-		return
-	}
+    existingprj, err := atdb.GetOneDoc[model.QrHistory](config.Mongoconn, "qrhistory", primitive.M{"_id": objectId, "owner._id": docuser.ID})
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: QR tidak ditemukan"
+        respn.Response = err.Error()
+        helper.WriteJSON(respw, http.StatusNotFound, respn)
+        return
+    }
 
-	// Preserve unmodifiable fields
-	prj.ID = existingprj.ID
-	prj.Secret = existingprj.Secret
-	prj.Owner = existingprj.Owner
+    prj.ID = existingprj.ID
+    prj.Secret = existingprj.Secret
+    prj.Owner = existingprj.Owner
 
-	// Update the QR document in the database
-	_, err = atdb.ReplaceOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID}, prj)
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error: Gagal memperbarui database"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusInternalServerError, respn)
-		return
-	}
+    // Set CreatedAt to current time when updating
+    prj.CreatedAt = time.Now() // Update the time to the current moment
 
-	// Return the updated QR
-	at.WriteJSON(respw, http.StatusOK, prj)
+    _, err = atdb.ReplaceOneDoc(config.Mongoconn, "qrhistory", primitive.M{"_id": existingprj.ID}, prj)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Gagal memperbarui database"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusInternalServerError, respn)
+        return
+    }
+
+    at.WriteJSON(respw, http.StatusOK, prj)
 }
-
 func DeleteQRHistory(respw http.ResponseWriter, req *http.Request) {
 	// Decode token from header
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
