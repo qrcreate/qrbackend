@@ -104,65 +104,50 @@ func PutTokenDataUser(respw http.ResponseWriter, req *http.Request) {
 }
 
 func PostDataUser(respw http.ResponseWriter, req *http.Request) {
-	fmt.Println("Token received:", at.GetLoginFromHeader(req))
-	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Token Tidak Valid"
-		respn.Info = at.GetLoginFromHeader(req)
-		respn.Location = "Decode Token Error"+config.PublicKeyWhatsAuth
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusForbidden, respn)
-		return
-	}
-	var usr model.Userdomyikado
-	err = json.NewDecoder(req.Body).Decode(&usr)
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Body tidak valid"
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
-	//pengecekan isian usr
-	if usr.Name == "" || usr.PhoneNumber == "" || usr.Email == "" {
-		var respn model.Response
-		respn.Status = "Isian tidak lengkap"
-		respn.Response = "Mohon isi lengkap Name, PhoneNumber, dan Email"
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
-	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
-	if err != nil {
-		usr.PhoneNumber = payload.Id
-		usr.Name = payload.Alias
-		idusr, err := atdb.InsertOneDoc(config.Mongoconn, "user", usr)
-		if err != nil {
-			var respn model.Response
-			respn.Status = "Gagal Insert Database"
-			respn.Response = err.Error()
-			at.WriteJSON(respw, http.StatusNotModified, respn)
-			return
-		}
-		usr.ID = idusr
-		at.WriteJSON(respw, http.StatusOK, usr)
-		return
-	}
-	//jika email belum gsign maka gsign dulu
-	if docuser.Email == "" {
-		var respn model.Response
-		respn.Status = "Email belum terdaftar"
-		respn.Response = "Mohon lakukan google sign in dahulu agar email bisa terdaftar"
-		at.WriteJSON(respw, http.StatusBadRequest, respn)
-		return
-	}
-	
-	
-		var respn model.Response
-		respn.Status = "User sudah terdaftar"
-		respn.Response = "Phone number sudah digunakan"
-		at.WriteJSON(respw, http.StatusConflict, respn)
+    // Decode body input
+    var usr model.Userdomyikado
+    err := json.NewDecoder(req.Body).Decode(&usr)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Body tidak valid"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
+
+    // Validasi input user
+    if usr.Name == "" || usr.PhoneNumber == "" || usr.Email == "" {
+        var respn model.Response
+        respn.Status = "Error: Isian tidak lengkap"
+        respn.Response = "Mohon isi lengkap Name, PhoneNumber, dan Email"
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
+
+    // Cek apakah PhoneNumber sudah terdaftar
+    existingUser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": usr.PhoneNumber})
+    if err == nil && existingUser != nil {
+        var respn model.Response
+        respn.Status = "Error: User sudah terdaftar"
+        respn.Response = "Phone number sudah digunakan"
+        at.WriteJSON(respw, http.StatusConflict, respn)
+        return
+    }
+
+    // Masukkan data user baru ke database
+    idusr, err := atdb.InsertOneDoc(config.Mongoconn, "user", usr)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Gagal Insert Database"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusInternalServerError, respn)
+        return
+    }
+
+    usr.ID = idusr // Assign ID yang dihasilkan dari database
+    at.WriteJSON(respw, http.StatusOK, usr)
 }
+
 
 func PostDataBioUser(respw http.ResponseWriter, req *http.Request) {
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
