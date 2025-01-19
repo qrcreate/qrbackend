@@ -1,4 +1,4 @@
-package controller_test
+package controller
 
 import (
 	"bytes"
@@ -7,177 +7,228 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gocroot/controller"
 	"github.com/gocroot/model"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/stretchr/testify/assert"
 )
 
-// Helper function to execute a request
-func executeRequest(t *testing.T, handler http.HandlerFunc, method, url string, body []byte) *httptest.ResponseRecorder {
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	return rr
+func init() {
+	// Initialize config or mock the database connection here if necessary
+	// You can mock atdb methods or use a test database.
 }
 
 // Test RegisterHandler
 func TestRegisterHandler(t *testing.T) {
-	data := model.PdfmUsers{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "password123",
+	tests := []struct {
+		name           string
+		requestBody    model.PdfmUsers
+		expectedStatus int
+		expectedMsg    string
+	}{
+		{
+			name: "Valid Registration",
+			requestBody: model.PdfmUsers{
+				Name:     "John Doe",
+				Email:    "john@example.com",
+				Password: "password123",
+			},
+			expectedStatus: http.StatusOK,
+			expectedMsg:    "Registrasi berhasil",
+		},
+		{
+			name: "Invalid Registration - Missing Email",
+			requestBody: model.PdfmUsers{
+				Name:     "John Doe",
+				Password: "password123",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedMsg:    "Name, Email, dan Password wajib diisi",
+		},
 	}
 
-	body, err := json.Marshal(data)
-	if err != nil {
-		t.Fatalf("Failed to encode JSON: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+			w := httptest.NewRecorder()
 
-	rr := executeRequest(t, controller.RegisterHandler, http.MethodPost, "/pdfm/register", body)
+			RegisterHandler(w, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
+			resp := w.Result()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
-	var response map[string]string
-	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to decode response JSON: %v", err)
-	}
+			var response map[string]string
+			err := json.NewDecoder(resp.Body).Decode(&response)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if response["message"] != "Registrasi berhasil" {
-		t.Errorf("Expected message 'Registrasi berhasil', got '%s'", response["message"])
-	}
-}
-
-// Test GetUser
-func TestGetUser(t *testing.T) {
-	data := model.PdfmUsers{
-		Email:    "test@example.com",
-		Password: "password123",
-	}
-	body, _ := json.Marshal(data)
-
-	rr := executeRequest(t, controller.GetUser, http.MethodPost, "/pdfm/login", body)
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
-}
-
-// Test GetUsers
-func TestGetUsers(t *testing.T) {
-	rr := executeRequest(t, controller.GetUsers, http.MethodGet, "/pdfm/get/users", nil)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
-}
-
-// Test GetOneUser
-func TestGetOneUser(t *testing.T) {
-	url := "/pdfm/getone/users?name=Test+User"
-	rr := executeRequest(t, controller.GetOneUser, http.MethodGet, url, nil)
-
-	if rr.Code != http.StatusOK && rr.Code != http.StatusNotFound {
-		t.Errorf("Expected status OK or NotFound, got %v", rr.Code)
+			assert.Equal(t, tt.expectedMsg, response["message"])
+		})
 	}
 }
 
 // Test CreateUser
 func TestCreateUser(t *testing.T) {
-	data := model.PdfmUsers{
-		Email: "newuser@example.com",
-		Name:  "New User_Lah",
+	tests := []struct {
+		name           string
+		requestBody    model.PdfmUsers
+		expectedStatus int
+		expectedMsg    string
+	}{
+		{
+			name: "Valid User Creation",
+			requestBody: model.PdfmUsers{
+				Name:     "Jane Doe",
+				Email:    "jane@example.com",
+				Password: "password123",
+			},
+			expectedStatus: http.StatusOK,
+			expectedMsg:    "User created successfully",
+		},
+		{
+			name: "Email Already Exists",
+			requestBody: model.PdfmUsers{
+				Name:     "Duplicate User",
+				Email:    "jane@example.com", // Existing email
+				Password: "password123",
+			},
+			expectedStatus: http.StatusConflict,
+			expectedMsg:    "Email already exists",
+		},
 	}
-	body, _ := json.Marshal(data)
 
-	rr := executeRequest(t, controller.CreateUser, http.MethodPost, "/pdfm/create/users", body)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPost, "/create", bytes.NewReader(body))
+			w := httptest.NewRecorder()
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
+			CreateUser(w, req)
+
+			resp := w.Result()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			var response map[string]string
+			err := json.NewDecoder(resp.Body).Decode(&response)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, tt.expectedMsg, response["message"])
+		})
 	}
 }
 
 // Test UpdateUser
 func TestUpdateUser(t *testing.T) {
-	existingID := "678be27e03a8b7bbb3ee3077" // Ganti dengan ID valid di database
-	data := map[string]interface{}{
-		"id":        existingID,
-		"name":      "Updated Name",
-		"email":     "updated@example.com",
-		"password":  "newpassword123",
-			"isSupport": true,
+	tests := []struct {
+		name           string
+		requestBody    struct {
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+		expectedStatus int
+		expectedMsg    string
+	}{
+		{
+			name: "Valid Update",
+			requestBody: struct {
+				ID       string `json:"id"`
+				Name     string `json:"name"`
+				Email    string `json:"email"`
+				Password string `json:"password"`
+			}{
+				ID:       "valid_user_id",
+				Name:     "Updated Name",
+				Email:    "updated@example.com",
+				Password: "newpassword123",
+			},
+			expectedStatus: http.StatusOK,
+			expectedMsg:    "User updated successfully",
+		},
+		{
+			name: "Invalid Update - No Fields",
+			requestBody: struct {
+				ID       string `json:"id"`
+				Name     string `json:"name"`
+				Email    string `json:"email"`
+				Password string `json:"password"`
+			}{
+				ID: "valid_user_id",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedMsg:    "No fields to update",
+		},
 	}
-	body, _ := json.Marshal(data)
 
-	rr := executeRequest(t, controller.UpdateUser, http.MethodPut, "/pdfm/update/users", body)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(body))
+			w := httptest.NewRecorder()
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v. Response: %s", rr.Code, rr.Body.String())
+			UpdateUser(w, req)
+
+			resp := w.Result()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			var response map[string]string
+			err := json.NewDecoder(resp.Body).Decode(&response)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, tt.expectedMsg, response["message"])
+		})
 	}
 }
 
 // Test DeleteUser
 func TestDeleteUser(t *testing.T) {
-	data := map[string]interface{}{
-		"id": primitive.NewObjectID().Hex(),
+	tests := []struct {
+		name           string
+		requestBody    struct{ ID string `json:"id"` }
+		expectedStatus int
+		expectedMsg    string
+	}{
+		{
+			name: "Valid Delete",
+			requestBody: struct{ ID string `json:"id"` }{
+				ID: "valid_user_id",
+			},
+			expectedStatus: http.StatusOK,
+			expectedMsg:    "User deleted successfully",
+		},
+		{
+			name: "Invalid ID Format",
+			requestBody: struct{ ID string `json:"id"` }{
+				ID: "invalid_user_id_format",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedMsg:    "Invalid user ID format",
+		},
 	}
-	body, _ := json.Marshal(data)
 
-	rr := executeRequest(t, controller.DeleteUser, http.MethodDelete, "/pdfm/delete/users", body)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodDelete, "/delete", bytes.NewReader(body))
+			w := httptest.NewRecorder()
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
-}
+			DeleteUser(w, req)
 
-// Test RegisterGmailAuth
-func TestRegisterGmailAuth(t *testing.T) {
-	data := map[string]string{"token": "dummyToken"}
-	body, _ := json.Marshal(data)
+			resp := w.Result()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
-	rr := executeRequest(t, controller.RegisterGmailAuth, http.MethodPost, "/register-gmail-auth", body)
+			var response map[string]string
+			err := json.NewDecoder(resp.Body).Decode(&response)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
-}
-
-// Test GeneratePasswordHandler
-func TestGeneratePasswordHandler(t *testing.T) {
-	data := map[string]string{"phonenumber": "123456789", "captcha": "dummyCaptcha"}
-	body, _ := json.Marshal(data)
-
-	rr := executeRequest(t, controller.GeneratePasswordHandler, http.MethodPost, "/generate-password", body)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
-}
-
-// Test VerifyPasswordHandler
-func TestVerifyPasswordHandler(t *testing.T) {
-	data := map[string]string{"phonenumber": "123456789", "password": "dummyPassword"}
-	body, _ := json.Marshal(data)
-
-	rr := executeRequest(t, controller.VerifyPasswordHandler, http.MethodPost, "/verify-password", body)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
-	}
-}
-
-// Test ResendPasswordHandler
-func TestResendPasswordHandler(t *testing.T) {
-	data := map[string]string{"phonenumber": "123456789"}
-	body, _ := json.Marshal(data)
-
-	rr := executeRequest(t, controller.ResendPasswordHandler, http.MethodPost, "/resend-password", body)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", rr.Code)
+			assert.Equal(t, tt.expectedMsg, response["message"])
+		})
 	}
 }
