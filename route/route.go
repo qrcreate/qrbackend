@@ -92,6 +92,8 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.RegisterGmailAuth(w, r)
 	case method == "POST" && path == "/data/user":
 		controller.PostDataUser(w, r)
+	case method == "PUT" && path == "/data/user":
+		controller.UpdateDataUser(w, r)
 	// case method == "POST" && path == "/upload/profpic": //upload gambar profile
 	// 	controller.UploadProfilePictureHandler(w, r)
 	case method == "POST" && path == "/data/user/bio":

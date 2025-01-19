@@ -8,6 +8,7 @@ import (
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
 	"github.com/whatsauth/itmodel"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/gocroot/helper/at"
@@ -39,25 +40,30 @@ func GetDataUserFromApi(respw http.ResponseWriter, req *http.Request) {
 }
 
 func GetDataUser(respw http.ResponseWriter, req *http.Request) {
-	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Token Tidak Valid "
-		respn.Info = at.GetSecretFromHeader(req)
-		respn.Location = "Decode Token Error: " + at.GetLoginFromHeader(req)
-		respn.Response = err.Error()
-		at.WriteJSON(respw, http.StatusForbidden, respn)
-		return
-	}
-	docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
-	if err != nil {
-		docuser.PhoneNumber = payload.Id
-		docuser.Name = payload.Alias
-		at.WriteJSON(respw, http.StatusNotFound, docuser)
-		return
-	}
-	docuser.Name = payload.Alias
-	at.WriteJSON(respw, http.StatusOK, docuser)
+    // Decode token untuk mendapatkan informasi pengguna
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Token Tidak Valid"
+        respn.Info = at.GetSecretFromHeader(req)
+        respn.Location = "Decode Token Error"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusForbidden, respn)
+        return
+    }
+
+    // Cari data pengguna berdasarkan nomor telepon (phonenumber) yang terdapat di token
+    docuser, err := atdb.GetOneDoc[model.Userdomyikado](config.Mongoconn, "user", primitive.M{"phonenumber": payload.Id})
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Pengguna Tidak Ditemukan"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusNotFound, respn)
+        return
+    }
+
+    // Kembalikan data pengguna yang ditemukan
+    at.WriteJSON(respw, http.StatusOK, docuser)
 }
 
 // melakukan pengecekan apakah suda link device klo ada generate token 5tahun
@@ -137,6 +143,55 @@ func PostDataUser(respw http.ResponseWriter, req *http.Request) {
     at.WriteJSON(respw, http.StatusOK, usr)
 }
 
+func UpdateDataUser(respw http.ResponseWriter, req *http.Request) {
+    // Decode token untuk mendapatkan informasi pengguna
+    payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Token Tidak Valid"
+        respn.Info = at.GetSecretFromHeader(req)
+        respn.Location = "Decode Token Error"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusForbidden, respn)
+        return
+    }
+
+    // Mengambil data user yang akan diupdate
+    var usr model.Userdomyikado
+    err = json.NewDecoder(req.Body).Decode(&usr)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error : Body tidak valid"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
+
+    // Validasi bahwa nama tidak kosong
+    if usr.Name == "" {
+        var respn model.Response
+        respn.Status = "Error: Nama tidak boleh kosong"
+        at.WriteJSON(respw, http.StatusBadRequest, respn)
+        return
+    }
+
+    // Update data nama user di database berdasarkan phone number yang ada di token
+    filter := bson.M{"phonenumber": payload.Id}
+    update := bson.M{"$set": bson.M{"name": usr.Name}}
+
+    // Menggunakan UpdateOne untuk mengupdate nama pengguna
+    _, err = atdb.UpdateOneDoc(config.Mongoconn, "user", filter, update)
+    if err != nil {
+        var respn model.Response
+        respn.Status = "Error: Gagal Update Database"
+        respn.Response = err.Error()
+        at.WriteJSON(respw, http.StatusInternalServerError, respn)
+        return
+    }
+
+    // Kembalikan data pengguna yang telah diperbarui
+    at.WriteJSON(respw, http.StatusOK, usr)
+}
 
 func PostDataBioUser(respw http.ResponseWriter, req *http.Request) {
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
